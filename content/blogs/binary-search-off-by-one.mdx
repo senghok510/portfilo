@@ -1,0 +1,43 @@
+---
+title: "The Off-by-One Bug in Binary Search"
+date: "2026-08-10"
+description: "A classic mistake in computing the midpoint, and how to avoid it."
+---
+
+Binary search looks simple, but a subtle bug hid in production libraries for
+years: computing the midpoint with `(low + high) / 2` can overflow when the
+array is large enough.
+
+## The buggy version
+
+```java
+int mid = (low + high) / 2; // overflows when low + high > Integer.MAX_VALUE
+```
+
+## The fix
+
+Compute the midpoint from the difference instead of the sum:
+
+```java
+int mid = low + (high - low) / 2;
+```
+
+In languages with arbitrary-precision integers, like Python, this particular
+bug can't happen — but it's a good reminder that even "textbook" algorithms
+deserve careful testing:
+
+```python
+def binary_search(items, target):
+    low, high = 0, len(items) - 1
+    while low <= high:
+        mid = (low + high) // 2  # safe in Python
+        if items[mid] == target:
+            return mid
+        if items[mid] < target:
+            low = mid + 1
+        else:
+            high = mid - 1
+    return -1
+```
+
+Small details matter — especially the ones that only fail at scale.
