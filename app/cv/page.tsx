@@ -55,7 +55,7 @@ const projects = [
   {
     title: "Optical Music Recognition (OMR)",
     org: "École Polytechnique",
-    period: "Sep 2025 – Present",
+    period: "Sep 2025",
     details: [
       "Improved the OMR pipeline using a YOLO model and a graph neural network to convert raw sheet music into MusicXML.",
     ],
@@ -162,7 +162,7 @@ export default function CVPage() {
         <div className="flex flex-wrap items-baseline justify-between gap-4">
           <h1 className="text-3xl font-semibold tracking-tight">Hok Seng</h1>
           <a
-            href="/cv.pdf"
+            href="/cv/cv.pdf"
             className="text-sm text-stone-500 underline decoration-stone-300 underline-offset-4 hover:text-stone-900 hover:decoration-stone-500"
           >
             Download PDF

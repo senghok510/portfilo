@@ -144,7 +144,7 @@ export default function AgenticGraphragPage() {
         </p>
         <p className="mt-1 text-sm text-stone-500">
           <a
-            href="/Soutenace_stage_3A_Hok_SENG_final.pdf"
+            href="/agentic-graphrag/defense-slides.pdf"
             className="underline decoration-stone-300 underline-offset-4 hover:text-stone-900 hover:decoration-stone-500"
           >
             Defense slides (PDF)
@@ -200,7 +200,7 @@ export default function AgenticGraphragPage() {
         <figure className="mt-6">
           <div className="overflow-hidden rounded-lg border border-stone-200 bg-white p-4">
             <Image
-              src="/graphrag-architecture.png"
+              src="/agentic-graphrag/architecture.png"
               alt="System architecture: a query flows through query understanding, domain prediction, and retrieval-need classification into one of four retrieval strategies, whose evidence is fused, reranked by a cross-encoder, and answered by an LLM."
               width={1310}
               height={915}

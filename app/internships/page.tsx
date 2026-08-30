@@ -14,7 +14,7 @@ const internships = [
     description:
       "Built an agentic GraphRAG system for tendering: implemented a Personalized PageRank algorithm for multi-hop questions and designed a multi-agent system to answer a wide range of queries over tender documents.",
     writeup: "/internships/agentic-graphrag",
-    slides: "/Soutenace_stage_3A_Hok_SENG_final.pdf",
+    slides: "/agentic-graphrag/defense-slides.pdf",
   },
   {
     company: "PPS",

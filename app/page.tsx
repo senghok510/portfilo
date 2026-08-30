@@ -4,7 +4,7 @@ export default function Home() {
   return (
     <section className="flex flex-1 flex-col items-center justify-center px-6 text-center">
       <Image
-        src="/profile.png"
+        src="/home/profile.png"
         alt="Portrait of Seng Hok"
         width={160}
         height={160}
