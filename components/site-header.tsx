@@ -1,30 +1,27 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 const links = [
-  { href: "/cv", label: "CV" },
-  { href: "/internships", label: "Internships" },
   { href: "/projects", label: "Projects" },
-  { href: "/blogs", label: "Blogs" },
+  { href: "/internships", label: "Experience" },
+  { href: "/blogs", label: "Writing" },
+  { href: "/cv", label: "Résumé" },
 ];
 
 export function SiteHeader() {
+  const pathname = usePathname();
   return (
-    <header className="border-b border-stone-200">
-      <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-6">
-        <Link href="/" className="text-base font-semibold tracking-tight">
-          Home
-        </Link>
-        <nav className="flex items-center gap-6 text-sm text-stone-600">
+    <header className="site-header">
+      <div className="header-inner">
+        <Link href="/" className="wordmark" aria-label="Hok Seng home">hs<span>.</span></Link>
+        <nav aria-label="Main navigation">
           {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="transition-colors hover:text-stone-900"
-            >
-              {link.label}
-            </Link>
+            <Link key={link.href} href={link.href} aria-current={pathname.startsWith(link.href) ? "page" : undefined}>{link.label}</Link>
           ))}
         </nav>
+        <a className="header-contact" href="mailto:hok.seng@polytechnique.edu">Let’s talk <span>↗</span></a>
       </div>
     </header>
   );

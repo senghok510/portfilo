@@ -11,7 +11,9 @@ export default function BlogsPage() {
 
   return (
     <section className="mx-auto w-full max-w-3xl px-6 py-12">
-      <h1 className="text-2xl font-semibold tracking-tight">Blogs</h1>
+      <p className="eyebrow index-eyebrow">THE NOTEBOOK</p>
+      <h1 className="text-2xl font-semibold tracking-tight">Thinking out loud.</h1>
+      <p className="index-intro">Notes on building, learning, and understanding the details. A collection of ideas worth writing down.</p>
       <ul className="mt-8 space-y-10">
         {posts.map((post) => (
           <li key={post.slug}>

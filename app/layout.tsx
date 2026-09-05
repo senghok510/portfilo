@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
     template: "%s — Hok Seng",
   },
   description:
-    "Computer science student. Projects, internships, and writing about the field.",
+    "Hok Seng — Data science and AI student at Institut Polytechnique de Paris. Explore projects in machine learning, generative AI, and applied mathematics.",
 };
 
 export default function RootLayout({
@@ -32,8 +33,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} flex min-h-dvh flex-col antialiased`}
       >
+        <a href="#main-content" className="skip-link">Skip to content</a>
         <SiteHeader />
-        <main className="flex flex-1 flex-col">{children}</main>
+        <main id="main-content" className="flex flex-1 flex-col">{children}</main>
+        <SiteFooter />
       </body>
     </html>
   );

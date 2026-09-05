@@ -29,7 +29,9 @@ const internships = [
 export default function InternshipsPage() {
   return (
     <section className="mx-auto w-full max-w-3xl px-6 py-12">
-      <h1 className="text-2xl font-semibold tracking-tight">Internships</h1>
+      <p className="eyebrow index-eyebrow">EXPERIENCE / IN THE REAL WORLD</p>
+      <h1 className="text-2xl font-semibold tracking-tight">From theory to impact.</h1>
+      <p className="index-intro">Building intelligent systems for real problems. A closer look at my internships, research, and the lessons along the way.</p>
       <ul className="mt-8 space-y-10">
         {internships.map((internship) => (
           <li key={`${internship.company}-${internship.period}`}>

@@ -39,7 +39,9 @@ const projects = [
 export default function ProjectsPage() {
   return (
     <section className="mx-auto w-full max-w-3xl px-6 py-12">
-      <h1 className="text-2xl font-semibold tracking-tight">School Projects</h1>
+      <p className="eyebrow index-eyebrow">THE PROJECT ARCHIVE</p>
+      <h1 className="text-2xl font-semibold tracking-tight">Ideas into experiments.</h1>
+      <p className="index-intro">Selected work across computer vision, generative AI, and applied mathematics. Explore the questions, methods, and results behind each project.</p>
       <ul className="mt-8 space-y-10">
         {projects.map((project) => (
           <li key={project.name}>
