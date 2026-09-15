@@ -9,7 +9,8 @@ RUN npm ci
 # ---------- 2. Build the Next.js app ----------
 FROM node:22-alpine AS builder
 WORKDIR /app
-ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NEXT_OUTPUT_STANDALONE=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build

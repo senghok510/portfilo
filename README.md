@@ -72,5 +72,5 @@ ports:
 ### How the image is built
 
 - `Dockerfile` is a three-stage build: install dependencies, run `next build`, then copy only the standalone server output into a small `node:22-alpine` runtime image that runs as a non-root user.
-- `next.config.ts` sets `output: "standalone"` so Next.js emits a self-contained `server.js`.
+- `next.config.ts` sets `output: "standalone"` so Next.js emits a self-contained `server.js`. This is only enabled when the `NEXT_OUTPUT_STANDALONE` environment variable is set, which the Dockerfile does. Plain `npm run build` and Vercel deployments are unaffected.
 - `content/` and `public/` are copied into the image because blog posts and assets are read at runtime.
