@@ -1,0 +1,6 @@
+import Link from "next/link";
+import type { Metadata } from "next";
+export const metadata: Metadata = { title: "Tutorials", description: "Detailed algorithm references with mathematical derivations, interactive figures, and practical decision guides." };
+export default function TutorialsPage() {
+  return <div className="tutorial-landing page-width"><p className="eyebrow">THE LEARNING LIBRARY</p><h1>Understand deeply.<br /><span>Choose deliberately.</span></h1><p className="tutorial-landing-intro">A growing collection of technical references. Built for the moment you need to move from knowing an algorithm’s name to understanding when, why, and how to use it.</p><Link href="/tutorials/machine-learning" className="tutorial-topic"><div><span className="eyebrow">01 / ALGORITHMS</span><h2>Machine Learning <span>↗</span></h2><p>From least squares to boosted trees. Derivations, interactive figures, worked examples, and an honest look at where each method breaks.</p><div className="tags"><span>5 in-depth references</span><span>Linear methods</span><span>Tree methods</span></div></div><div className="topic-art" aria-hidden="true"><span>ŷ = f(x)</span><i /><i /><i /></div></Link><p className="tutorial-scope">Current focus: algorithms and their mathematical behavior. Broader pipeline design will be covered separately.</p></div>;
+}

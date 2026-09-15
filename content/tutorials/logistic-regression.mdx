@@ -1,0 +1,162 @@
+<h2 id="intuition">Intuition & scope</h2>
+
+Logistic regression turns an additive score into a probability for a binary outcome. The score can be any real number; the sigmoid maps it between zero and one. The fitted coefficients are linear effects on **log-odds**, not constant effects on probability. Despite its name, the usual machine-learning use is classification.
+
+Imagine several weak indicators of an event. Logistic regression combines their contributions into one score and then converts that score to a probability. It is especially useful when many features each carry a small amount of signal, as in sparse document representations. It does not automatically learn “feature A matters only when feature B is large” unless the representation contains that interaction.
+
+A probability model and a decision rule are separate objects. The model estimates an event probability. A threshold then converts that estimate into an action or class label. Changing the threshold does not refit the coefficients or change the underlying probability curve.
+
+<h2 id="notation">Symbols & notation</h2>
+
+<Symbols rows={[["n,p", "Number of observations and supplied features."], ["y_i\\in\\{0,1\\}", "Binary target, with 1 denoting the event of interest."], ["\\tilde x_i,X", "Feature vector with an intercept; design matrix of augmented rows."], ["\\beta, z_i=\\tilde x_i^\\top\\beta", "Coefficient vector and raw score, also called the logit."], ["\\sigma(z),\\pi_i", "Sigmoid function and modeled event probability."], ["W", "Diagonal matrix with entries πᵢ(1−πᵢ)."], ["D,\\lambda", "diag(0,1,…,1) and nonnegative L2 penalty strength."], ["\\tau", "Probability threshold used to predict class 1."], ["K,\\beta_k", "Number of classes and coefficient vector for class k in a softmax model."], ["c_{\\rm FP},c_{\\rm FN}", "Costs of a false positive and false negative; correct decisions have zero cost in the example."]]} />
+
+<h2 id="mathematics">Mathematical foundations</h2>
+
+### Probability, odds, and log-odds
+
+<Equation math={String.raw`\pi_i=P(Y_i=1\mid x_i)=\sigma(z_i)=\frac{1}{1+e^{-z_i}},\qquad \log\frac{\pi_i}{1-\pi_i}=\tilde x_i^\top\beta`} />
+
+Increasing feature j by one unit multiplies the modeled odds by exp(βⱼ), holding other supplied features fixed. An odds ratio of two does not mean that the probability doubles. If the initial probability is 0.5, doubling the odds produces a probability of 2/3. If the initial probability is 0.1, it produces approximately 0.182.
+
+<Equation math={String.raw`\frac{\partial\pi(x)}{\partial x_j}=\beta_j\pi(x)[1-\pi(x)]`} label="For a raw additive feature without interactions, the marginal probability effect depends on the current input through π(x)." />
+
+The response is steepest near probability 0.5 and flattens near zero and one. A very confident fitted probability can result from extrapolating a large score; confidence is not proof that the input is well represented in training.
+
+### From Bernoulli likelihood to cross-entropy
+
+For conditionally independent observations, the likelihood is a product of Bernoulli probabilities. Taking minus the logarithm turns the product into a sum.
+
+<Equation math={String.raw`L(\beta)=\prod_{i=1}^n\pi_i^{y_i}(1-\pi_i)^{1-y_i},\qquad J(\beta)=-\frac1n\sum_{i=1}^n\left[y_i\log\pi_i+(1-y_i)\log(1-\pi_i)\right]`} />
+
+Substituting the sigmoid yields an equivalent score-space expression:
+
+<Equation math={String.raw`J(\beta)=\frac1n\sum_{i=1}^n\left[\log(1+e^{z_i})-y_i z_i\right]`} label="Numerical implementations use a stable softplus/log-sum-exp calculation rather than computing exp(z) naively." />
+
+For a given true conditional event probability, expected log loss is minimized at that same probability. This is a property of the population loss, not a guarantee that a restricted, regularized model estimates every probability correctly.
+
+### Gradient, Hessian, and convexity
+
+<Equation math={String.raw`\nabla J(\beta)=\frac1nX^\top(\pi-y),\qquad \nabla^2J(\beta)=\frac1nX^\top W X,\quad W_{ii}=\pi_i(1-\pi_i)`} />
+
+Each diagonal weight is nonnegative, so the Hessian is positive semidefinite. The negative log-likelihood is convex in the coefficients. Convexity rules out isolated bad local minima, but it does **not** guarantee that the infimum occurs at a finite coefficient vector. Complete separation is the key counterexample.
+
+With the intercept excluded from an L2 penalty:
+
+<Equation math={String.raw`J_\lambda(\beta)=J(\beta)+\frac\lambda2\beta^\top D\beta,\quad g_\lambda=\frac1nX^\top(\pi-y)+\lambda D\beta,\quad H_\lambda=\frac1nX^\top W X+\lambda D`} />
+
+L2 shrinkage discourages extreme slopes and helps identify weakly supported directions. With both classes represented and an ordinary identifiable design, it also addresses slope divergence under separation. An unpenalized intercept still diverges in the degenerate all-one-class case; many libraries reject that input entirely.
+
+### Multiclass extension
+
+A softmax model assigns each class a score and normalizes exponentials across classes:
+
+<Equation math={String.raw`P(Y=k\mid x)=\frac{e^{\tilde x^\top\beta_k}}{\sum_{c=1}^K e^{\tilde x^\top\beta_c}},\qquad J=-\frac1n\sum_i\sum_{k=1}^K\mathbf1\{y_i=k\}\log P(Y_i=k\mid x_i)`} />
+
+Adding the same coefficient vector to all class coefficient vectors leaves probabilities unchanged. A reference class or another constraint handles this identifiability. One-vs-rest logistic models are a different construction: independent binary objectives do not equal a single multinomial likelihood.
+
+<h2 id="learning">How learning works</h2>
+
+There is generally no closed-form coefficient solution. Starting from finite coefficients, an optimizer repeatedly computes probabilities and a search direction, then updates the coefficients until its convergence condition is met.
+
+Newton’s method solves a local quadratic approximation:
+
+<Equation math={String.raw`H_\lambda(\beta^{(t)})\,\Delta^{(t)}=g_\lambda(\beta^{(t)}),\qquad \beta^{(t+1)}=\beta^{(t)}-\Delta^{(t)}`} label="Solve the linear system; do not explicitly invert the Hessian. A damped step or line search can improve numerical behavior." />
+
+For unpenalized fitting with strictly positive working weights, this is equivalent to iteratively reweighted least squares. Define a working response uᵢ = zᵢ + (yᵢ − πᵢ)/(πᵢ(1−πᵢ)); solve a weighted least-squares problem for u, then repeat. These are optimization weights, not user-assigned importance weights. Near probabilities zero or one, this algebra can become numerically delicate.
+
+Quasi-Newton methods such as L-BFGS approximate curvature without storing the full dense Hessian. First-order or variance-reduced stochastic solvers can be useful for large sparse problems. A dense gradient costs O(np); explicit Hessian construction costs O(np²) and dense factorization O(p³). The total cost depends on conditioning and convergence iterations. Binary prediction costs O(p).
+
+The [official logistic-regression documentation](https://scikit-learn.org/stable/modules/linear_model.html#logistic-regression) describes supported solver and penalty combinations. A convergence warning is a statement about optimization, not a reliable estimate of prediction quality.
+
+<h2 id="example">Worked example & figure</h2>
+
+Consider a deliberately specified model with intercept −2 and slope 0.8. At x = 3, the score is 0.4, the odds are exp(0.4) ≈ 1.492, and the probability is about 0.599. Increasing x to 4 changes the score to 1.2 and the probability to approximately 0.769. The odds were multiplied by exp(0.8) ≈ 2.226; the probability increased by approximately 0.170.
+
+For an observation with label 1 at x = 3, its unaveraged loss is −log(0.599) ≈ 0.513. Its score derivative is 0.599 − 1 ≈ −0.401. A gradient step therefore tries to raise the score for that observation, subject to all other observations and the penalty.
+
+The interactive figure uses a different intercept, zero, so all curves share one visible midpoint.
+
+<AlgorithmLab kind="logistic-regression" />
+
+### The threshold is a separate decision
+
+<Equation math={String.raw`\hat y=\mathbf1\{\pi(x)\ge\tau\},\qquad \tilde x^\top\beta\ge\log\frac\tau{1-\tau}`} />
+
+For a threshold of 0.5 the boundary is a hyperplane at score zero. With correctly estimated probabilities, fixed false-positive and false-negative costs, and zero cost for correct predictions, predicting positive has lower expected cost when:
+
+<Equation math={String.raw`c_{\rm FP}(1-\pi)\le c_{\rm FN}\pi\quad\Longleftrightarrow\quad\pi\ge\frac{c_{\rm FP}}{c_{\rm FP}+c_{\rm FN}}`} label="This is a mathematical decision example, not a universal operational threshold." />
+
+<h2 id="controls">Algorithm controls</h2>
+
+<ReferenceTable headers={["Control", "Effect", "Watch for"]} rows={[["Feature representation", "Determines what is linear in log-odds.", "Raw additive features cannot express XOR without an interaction or another transformation."], ["L2 / L1 / elastic-net", "Shrinkage, sparsity, or both.", "Regularization strength depends on feature units and loss normalization."], ["Inverse strength C", "In scikit-learn, smaller C generally means stronger regularization.", "C is not universally equal to 1/λ across sum/mean objectives and weighting conventions."], ["Solver and tolerance", "Control numerical optimization and accepted convergence error.", "Check penalty compatibility; a larger iteration cap does not fix an unidentified unpenalized model."], ["Class / sample weights", "Reweight likelihood contributions.", "The estimated probability target changes; weighted fitting is not the same operation as moving a threshold."]]} />
+
+To see the last point, suppose all positives are weighted by a and all negatives by b. At a fixed input with true probability π, the unrestricted weighted log-loss minimizer is:
+
+<Equation math={String.raw`q^*(x)=\frac{a\pi(x)}{a\pi(x)+b[1-\pi(x)]}`} label="With unequal class weights, the natural probability target of the weighted objective is q*, not the original π." />
+
+<h2 id="assumptions">Assumptions & guarantees</h2>
+
+The feature distribution need not be Gaussian, and predictors need not be statistically independent. The structural assumption is that the chosen linear score adequately represents the conditional log-odds. Independence of observations supports the simple product likelihood; dependence changes uncertainty calculations and potentially the statistical model needed.
+
+Under correct specification, identifiability, a finite population parameter, and suitable regularity conditions, the maximum-likelihood estimate is consistent and asymptotically normal. Its information-based covariance uses the inverse of the **summed** Hessian XᵀWX, rather than the inverse mean-loss Hessian without an additional sample-size factor. These are large-sample results; sparse events and separation can invalidate simple approximations.
+
+Probabilities are not guaranteed calibrated in a finite sample. Misspecification, regularization, sampling changes, or class weighting can all make them systematically too high or low. An interpretable coefficient remains conditional on which other variables and transformations are included. Logistic odds ratios are also non-collapsible: marginal and conditional odds ratios can differ even without classical confounding.
+
+<h2 id="limitations">Limitations & vulnerabilities</h2>
+
+- **Complete or quasi-complete separation:** if a hyperplane separates the classes, increasing its coefficient magnitude can keep improving unpenalized likelihood without a finite optimum. Huge coefficients and unstable standard errors are symptoms, not strong evidence of a huge real effect.
+- **Wrong boundary geometry:** concentric rings or XOR cannot be represented by a raw linear score. A sigmoid changes the score scale, not the boundary’s geometry.
+- **Collinearity:** several nearly redundant predictors make individual coefficients weakly identified. L2 stabilizes them but does not make their separate effects uniquely meaningful.
+- **Outliers and poisoning:** the score derivative π − y is bounded, but the coefficient gradient multiplies it by the feature vector. Extreme inputs can therefore still create large parameter gradients.
+- **Input perturbations:** the logit change is βᵀδ. Near a decision boundary, a small change can flip a hard label even if the corresponding probability change is small. In Euclidean feature units, distance to the 0.5 hyperplane is |z| divided by the slope norm, when the slope is nonzero.
+- **Distribution shift:** a change in event prevalence, feature support, or conditional mechanism can break probability estimates. A convex training objective provides no protection against that change.
+
+<Insight title="A useful distinction"><p>“The optimizer found the global minimum” is an optimization statement. “The probabilities are reliable in deployment” is a much stronger statistical statement that does not follow from convexity.</p></Insight>
+
+<h2 id="applications">Applications & evidence</h2>
+
+**Foundational modeling paper:** [Cox (1958), The Regression Analysis of Binary Sequences](https://academic.oup.com/jrsssb/article/20/2/215/7027376), studies binary responses whose probabilities depend on explanatory variables. It supplies historical context for the likelihood-based approach, rather than a modern benchmark comparison.
+
+**Reproducible application illustration:** the [scikit-learn sparse document classification example](https://scikit-learn.org/stable/auto_examples/text/plot_document_classification_20newsgroups.html) includes logistic regression among classifiers applied to text features. The relevant algorithmic reason to consider it is that a single weighted sum can aggregate evidence from many sparse dimensions.
+
+**Illustrative project use:** predicting a binary outcome from a small set of meaningful covariates can make odds-based explanations convenient. Such a model describes conditional associations; it does not establish the effect of intervening on a feature.
+
+<h2 id="comparison">Choosing this algorithm</h2>
+
+<ReferenceTable headers={["Alternative", "Critical difference", "Decision note"]} rows={[["Linear regression on 0/1 targets", "Squared loss targets a linear probability approximation and can predict outside [0,1].", "Use logistic regression when a Bernoulli probability model and log-loss objective are appropriate."], ["Small decision tree", "Threshold rules and interactions are learned directly.", "Useful for concise nonlinear rules; less stable and often gives coarse leaf probabilities."], ["Random forest", "Averages many nonlinear partitions.", "Useful when interactions are hard to specify; sacrifices a single coefficient explanation."], ["XGBoost", "Builds a nonlinear score through sequential trees.", "Useful for structured interactions; increases complexity and regularization decisions."]]} />
+
+A logistic model with a well-designed basis can outperform a more complex learner when the basis captures the relevant structure. A raw logistic model can underfit badly when that structure is absent. Choose the representation and algorithm together.
+
+<h2 id="implementation">Implementation reference</h2>
+
+The first calculation verifies the worked example. The second fits a small, deliberately non-separated dataset with the library’s default L2-regularized logistic model.
+
+```python
+import numpy as np
+from sklearn.linear_model import LogisticRegression
+
+z = -2.0 + 0.8 * 3.0
+p = 1.0 / (1.0 + np.exp(-z))
+loss_for_positive = np.logaddexp(0.0, z) - z
+assert np.isclose(p, 0.5986876601)
+assert np.isclose(loss_for_positive, -np.log(p))
+
+X = np.array([[-2.0], [-1.0], [0.0], [1.0], [2.0], [3.0]])
+y = np.array([0, 0, 1, 0, 1, 1])
+model = LogisticRegression(C=1.0, solver="lbfgs", max_iter=1000)
+model.fit(X, y)
+# Probability columns follow model.classes_, not an assumed order.
+positive_column = np.flatnonzero(model.classes_ == 1)[0]
+probability = model.predict_proba([[1.5]])[0, positive_column]
+print(probability, model.decision_function([[1.5]]))
+```
+
+The small toy fit is not a model-selection recommendation. Inspect solver convergence and remember that coefficient units follow your supplied features. Changing a decision threshold should operate on the probability output; it should not be implemented by silently changing class labels or class weights.
+
+<h2 id="references">Sources & further reading</h2>
+
+1. [Cox (1958), The Regression Analysis of Binary Sequences](https://academic.oup.com/jrsssb/article/20/2/215/7027376): original binary-response modeling research.
+2. [scikit-learn: Logistic regression](https://scikit-learn.org/stable/modules/linear_model.html#logistic-regression): objective, penalties, and solver compatibility.
+3. [An Introduction to Statistical Learning](https://www.statlearning.com/): the classification chapter for likelihood and decision-boundary interpretation.
+4. [scikit-learn: Sparse document classification](https://scikit-learn.org/stable/auto_examples/text/plot_document_classification_20newsgroups.html): executable text application example.
+5. [scikit-learn: Decision-threshold tuning](https://scikit-learn.org/stable/modules/classification_threshold.html): a focused reference on separating probability estimation from the action threshold.

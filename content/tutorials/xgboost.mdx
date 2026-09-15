@@ -1,0 +1,202 @@
+<h2 id="intuition">Intuition & scope</h2>
+
+Boosting builds an additive model in stages. Each new learner is chosen in response to the current model’s errors or loss derivatives, and its contribution is added to the existing predictor. This differs fundamentally from a random forest, whose trees are fitted independently and then averaged.
+
+**Gradient boosting** is the general idea of descending a loss in function space using restricted learners, often shallow trees. **XGBoost** is a particular framework that combines regularized tree objectives, gradient and curvature information, and efficient split-finding machinery. Calling every boosted-tree method “XGBoost” loses important distinctions about optimization and implementation.
+
+For regression, the additive score can itself be the prediction. For binary classification, the additive score is typically a logit converted to a probability by a sigmoid. The tree added at a classification round therefore contributes to a score; it does not directly add a standalone probability.
+
+This chapter focuses on constant-leaf tree boosting with smooth scalar losses. It introduces gradient boosting, derives the standard second-order XGBoost leaf and split formulas, and distinguishes the mathematical objective from practical approximations. Ranking, survival, vector-valued objectives, and alternative boosters require additional formulations.
+
+<h2 id="notation">Symbols & notation</h2>
+
+<Symbols rows={[["n,p", "Number of training observations and features."], ["F_m(x),f_m(x)", "Ensemble score after m rounds and the new tree contribution at round m."], ["M,\\eta", "Number of boosting rounds and shrinkage (learning rate)."], ["\\ell(y,F)", "Per-observation loss in score space."], ["g_i,h_i", "First and second derivatives of loss with respect to the current score."], ["q(x),T", "Mapping from input to a tree leaf and number of leaves in that tree."], ["w_j,I_j", "Score assigned to leaf j and training observations assigned to it."], ["G_j,H_j", "Sums of gradients and Hessians within leaf j."], ["\\lambda,\\alpha,\\gamma", "L2 leaf penalty, optional L1 leaf penalty, and penalty per leaf."], ["r_{im},c_{jm}", "Pseudo-residual at round m and a fitted leaf correction."], ["\\pi_i=\\sigma(F(x_i))", "Binary positive-class probability for logistic loss."], ["S(G,\\alpha)", "Soft-threshold operator sign(G) max(|G|−α,0)."]]} />
+
+<h2 id="mathematics">Mathematical foundations</h2>
+
+### Stagewise additive modeling
+
+Start with a constant minimizing the initial loss, then add a shrunken learner at each round:
+
+<Equation math={String.raw`F_0(x)=\arg\min_c\sum_{i=1}^n\ell(y_i,c),\qquad F_m(x)=F_{m-1}(x)+\eta f_m(x),\quad 0<\eta\le1`} />
+
+For half squared error, the initial constant is the target mean. For unweighted binary logistic loss with both classes present, it is the log-odds of the observed positive fraction. Libraries can estimate or configure initial scores differently; this equation defines the mathematical starting point used here.
+
+Gradient boosting uses negative score gradients, sometimes called pseudo-residuals:
+
+<Equation math={String.raw`r_{im}=-\left.\frac{\partial\ell(y_i,F)}{\partial F}\right|_{F=F_{m-1}(x_i)}`} />
+
+A regression tree is fitted to approximate these quantities. For half squared error, they are exactly the ordinary residuals yᵢ − F(xᵢ). For other losses, “fit the residuals” is shorthand for fitting negative loss derivatives, not necessarily the difference between the label and the final prediction.
+
+In a generic gradient-boosting algorithm, a fitted tree defines regions, and leaf values can then be refined by minimizing the original loss over a constant correction in each region. Friedman’s [Greedy Function Approximation: A Gradient Boosting Machine (2001)](https://doi.org/10.1214/aos/1013203451) develops the function-space viewpoint.
+
+### XGBoost’s regularized objective
+
+Let a new tree map each input to one of T leaves, each with a scalar weight. The standard regularizer penalizes both the number of leaves and their magnitudes:
+
+<Equation math={String.raw`f(x)=w_{q(x)},\qquad \Omega(f)=\gamma T+\frac\lambda2\sum_{j=1}^T w_j^2`} />
+
+At the current round, freeze the existing ensemble. The new tree is chosen to improve the objective consisting of the summed loss plus the tree penalty. A second-order Taylor approximation around the current scores removes terms that do not depend on the new tree:
+
+<Equation math={String.raw`\widetilde{\mathcal L}(f)=\sum_{i=1}^n\left[g_i f(x_i)+\frac12h_i f(x_i)^2\right]+\Omega(f)`} />
+
+<Equation math={String.raw`g_i=\left.\frac{\partial\ell(y_i,F)}{\partial F}\right|_{F=F_{m-1}(x_i)},\qquad h_i=\left.\frac{\partial^2\ell(y_i,F)}{\partial F^2}\right|_{F=F_{m-1}(x_i)}`} />
+
+This uses a **sum loss**, unlike the mean losses used in the linear chapters. Rescaling all losses changes the relative strength of the penalties unless their coefficients are also rescaled. The tree optimization below is written before shrinkage; practical boosting then scales the added leaf outputs by the learning rate. Do not insert shrinkage into only one term of the gain derivation.
+
+### Derive the optimal leaf weight
+
+For a fixed tree structure, aggregate derivative statistics by leaf:
+
+<Equation math={String.raw`G_j=\sum_{i\in I_j}g_i,\qquad H_j=\sum_{i\in I_j}h_i,\qquad \widetilde{\mathcal L}=\sum_{j=1}^T\left[G_jw_j+\frac12(H_j+\lambda)w_j^2\right]+\gamma T`} />
+
+Each leaf is now an independent scalar quadratic. Differentiating with respect to its weight and assuming a positive denominator gives:
+
+<Equation math={String.raw`w_j^*=-\frac{G_j}{H_j+\lambda},\qquad \widetilde{\mathcal L}^{\,*}(q)=-\frac12\sum_{j=1}^T\frac{G_j^2}{H_j+\lambda}+\gamma T`} label="The optimum is conditional on the chosen leaf assignments. A greedy search still has to choose the tree structure." />
+
+The numerator summarizes which direction predictions should move. The denominator combines local curvature with a shrinkage penalty. A large gradient and small curvature can imply a large step, which motivates controls on leaf support, weight magnitude, and learning rate.
+
+### Derive the split gain
+
+Compare the optimized objective of an unsplit parent to that of two children. Their gradient and Hessian sums add up to the parent’s. The split adds one net leaf, so it pays one extra leaf penalty:
+
+<Equation math={String.raw`\operatorname{Gain}=\frac12\left[\frac{G_L^2}{H_L+\lambda}+\frac{G_R^2}{H_R+\lambda}-\frac{(G_L+G_R)^2}{H_L+H_R+\lambda}\right]-\gamma`} />
+
+This is the regularized reduction of the **quadratic surrogate** for that candidate split. A positive unconstrained gain does not override minimum-child-weight, maximum-depth, or monotonic constraints. Greedy split choice is not a global search over every possible tree.
+
+### Optional L1 penalty
+
+Adding α times the sum of absolute leaf weights changes the optimum by soft-thresholding the gradient sum:
+
+<Equation math={String.raw`w_j^*=-\frac{S(G_j,\alpha)}{H_j+\lambda},\qquad S(G,\alpha)=\operatorname{sign}(G)\max(|G|-\alpha,0)`} />
+
+The optimized leaf score uses the squared soft-thresholded gradient in place of G². This can make a leaf correction exactly zero. It is a penalty on **leaf outputs**, not the same operation as lasso feature selection in a linear model. A feature may still appear in the tree structure even when a particular leaf output is shrunk.
+
+### Important loss derivatives
+
+<Equation math={String.raw`\ell_{\rm square}(y,F)=\tfrac12(y-F)^2:\quad g=F-y,\quad h=1`} />
+
+<Equation math={String.raw`\ell_{\rm logistic}(y,F)=\log(1+e^F)-yF:\quad g=\sigma(F)-y,\quad h=\sigma(F)[1-\sigma(F)]`} />
+
+For squared error, the Taylor expansion is exact as a function of the score. For logistic loss it is local. The logistic Hessian becomes small at extreme probabilities, so a few confident mistakes can create large unconstrained Newton-style corrections. Multiclass softmax has coupled class derivatives; its implementation should not be inferred by blindly copying the scalar leaf formula for every class.
+
+The [official boosted-tree tutorial](https://xgboost.readthedocs.io/en/stable/tutorials/model.html) is a concise reference for the regularized tree-score construction; [Chen and Guestrin (2016)](https://arxiv.org/abs/1603.02754) describe the original system.
+
+<h2 id="learning">How learning works</h2>
+
+1. Initialize model scores with a suitable base prediction.
+2. Compute first and second score derivatives for the selected objective.
+3. For candidate splits, aggregate gradient and Hessian statistics on each side.
+4. Choose valid splits according to the regularized gain, subject to structural constraints.
+5. Compute regularized leaf weights for the resulting tree and shrink its contribution by the learning rate.
+6. Update the current scores, recompute derivatives, and continue to the next round.
+
+Rounds depend on earlier rounds, so ordinary boosting is sequential across stages. Within a stage, candidate computations, feature work, and histogram construction can be parallelized. This is a different parallelism pattern from fitting independent forest trees.
+
+Exact greedy splitting scans candidate thresholds. Histogram methods aggregate values into bins and scan their derivative sums, reducing the number of thresholds considered at the cost of approximation. Sparse-aware splitting can learn a default direction for missing values by comparing gains. Missing values are therefore routed through the model; they are not necessarily imputed to zero.
+
+For a scalar-output model with M trees of typical depth d, prediction is about O(Md) and storage scales with total node count. Training complexity depends heavily on bin counts, sparsity, tree-growth policy, and hardware, so one universal Big-O expression is misleading. More bins generally permit finer threshold resolution but use additional memory and work. The original paper details sparsity-aware learning and approximate split machinery; current options are defined by the [parameter documentation](https://xgboost.readthedocs.io/en/stable/parameter.html).
+
+<h2 id="example">Worked example & figure</h2>
+
+### One exact numerical split calculation
+
+Use half squared error. Four targets are 0, 0, 2, 2, and all current scores are 1. The gradients are 1, 1, −1, −1 and all Hessians are one. Consider a threshold that puts the first two observations left and the other two right. Choose λ = 1, γ = 0.1, and no L1 penalty.
+
+<Equation math={String.raw`G_L=2,\ H_L=2,\ G_R=-2,\ H_R=2,\qquad w_L=-\frac23,\quad w_R=\frac23`} />
+
+<Equation math={String.raw`\operatorname{Gain}=\frac12\left[\frac43+\frac43-\frac0{5}\right]-0.1=\frac43-0.1\approx1.2333`} />
+
+At learning rate 0.3, the new scores become 0.8, 0.8, 1.2, 1.2. The mean squared prediction error decreases from 1 to 0.64. That MSE is **not** the same quantity as the gain above: the gain compares optimized regularized surrogate objectives before shrinkage, whereas the MSE reports unpenalized squared prediction error after shrinkage.
+
+### Watch several boosting rounds
+
+The interactive calculation below uses exact residual-fitting stumps on eight synthetic regression points. It demonstrates ordinary squared-error gradient boosting. It intentionally does not claim to implement XGBoost’s complete second-order, constrained, regularized tree learner.
+
+<AlgorithmLab kind="xgboost" />
+
+With a smaller learning rate, each correction is more conservative, so more rounds are needed to fit the same structure. A falling training loss says only that the model is fitting these observations better. It does not establish that continued rounds improve predictions outside them.
+
+<h2 id="controls">Algorithm controls</h2>
+
+<ReferenceTable headers={["Control", "What it changes", "Critical interpretation"]} rows={[["learning_rate / eta", "Scales each added tree’s contribution.", "Smaller values generally need more rounds; they do not remove the need to control capacity."], ["n_estimators / rounds", "Number of sequential corrections.", "Can continue fitting noise; behaves differently from merely adding forest trees."], ["max_depth / max_leaves", "Complexity and interaction capacity of individual trees.", "Deeper trees can fit localized combinations with little support."], ["min_child_weight", "Minimum sum of Hessians in a child.", "Not generally a row count. For half squared error with unit weights it equals a count; for logistic loss it does not."], ["reg_lambda / reg_alpha", "L2 and L1 penalties on leaf outputs.", "Stabilize correction magnitudes; neither is a simple penalty on how many input features are used."], ["gamma / min_split_loss", "Required gain through a leaf-complexity penalty.", "Discourages extra leaves that bring too little surrogate improvement."], ["subsample / colsample_*", "Randomness in row or column availability.", "Can regularize and reduce work, but may hide scarce useful signal."], ["max_delta_step", "Bounds an update’s leaf-output magnitude when enabled.", "Can constrain large corrections under small curvature."], ["max_bin / tree_method", "Approximation and computation of candidate thresholds.", "Changes speed, memory, and numerical resolution of split search."]]} />
+
+Monotonic constraints can restrict the fitted response to increase or decrease with selected features; interaction constraints restrict which features can appear together. These encode structural requirements within the supported booster, but do not prove that the requirement is true in the data-generating process. Early stopping is a way to choose the number of rounds using a separate signal; a full treatment of that evaluation procedure belongs in the later pipeline reference.
+
+<h2 id="assumptions">Assumptions & guarantees</h2>
+
+The scalar second-order derivation assumes a differentiable loss with meaningful curvature and positive regularized leaf denominators. The common squared and logistic losses satisfy the needed nonnegative-curvature condition. Custom objectives can violate it; implementation handling of invalid Hessians is not the same as a valid derivation.
+
+For a fixed partition, the leaf weights optimize the local regularized quadratic. The tree structure is chosen greedily, and the loss expansion may be approximate. Therefore there is no general claim that XGBoost globally minimizes the full objective over all ensembles. Constraints, subsampling, histogram approximations, and finite numerical tolerance introduce further differences from an unconstrained idealization.
+
+A constant-leaf boosted ensemble remains piecewise constant on the joint partition induced by all its trees. It can create a very fine approximation to smooth functions inside observed support, but it still becomes flat beyond outer feature thresholds in a fixed feature direction. Unlike an ordinary mean-leaf forest, its additive corrections are not a convex combination of targets, so regression predictions **can** lie outside the training target range. Being outside that range is not the same as learning a reliable extrapolating trend.
+
+<h2 id="limitations">Limitations & vulnerabilities</h2>
+
+- **Noise chasing:** later trees respond to remaining loss, including noise and corrupted labels. Squared error puts especially strong pressure on large residuals.
+- **Coupled controls:** learning rate, rounds, depth, child weight, and leaf penalties interact. A parameter value has little meaning without the surrounding configuration and loss scale.
+- **Limited extrapolation:** many step functions can mimic a smooth curve on the observed region but do not establish its continuation outside it.
+- **Greedy geometry:** axis-aligned candidate splits can miss oblique or distributed patterns; deeper trees increase flexibility at a computational and statistical cost.
+- **Small-curvature corrections:** logistic examples with confident errors can induce large Newton weights. Minimum Hessian support, L2 penalties, shrinkage, and update bounds affect this behavior in different ways.
+- **Sensitivity to routing:** small perturbations near split thresholds can change several tree outputs. Learned missing-value directions can also behave differently if missingness mechanisms change.
+- **Opaque explanations:** gain-based importance describes training objective improvements. It is not a signed effect, a calibrated confidence measure, or a causal ranking.
+- **Custom-objective mistakes:** returning probability-space derivatives when the library expects score-space derivatives can silently optimize the wrong problem. The target encoding, output link, and derivative convention must agree.
+
+<Insight title="Regularization is specific, not magical"><p>Leaf penalties control aspects of the fitted function. They do not certify resilience to arbitrary attacks, eliminate data dependence, or guarantee valid probabilities after deployment conditions change.</p></Insight>
+
+<h2 id="applications">Applications & evidence</h2>
+
+**Original system paper:** [Chen and Guestrin (2016), XGBoost: A Scalable Tree Boosting System](https://arxiv.org/abs/1603.02754), describes the algorithm and system design, including large-scale experiments. It is evidence for the reported system and settings, not a claim that XGBoost wins every structured-data problem.
+
+**A project on this portfolio:** [Influencer or Observer: Predicting Social Roles](/projects/influencer-observer) uses XGBoost alongside LightGBM, engineered user features, language-model embeddings, and an ensemble. The project is an application reference, but its overall result should not be attributed to XGBoost alone because several components contribute.
+
+**General boosting foundation:** [Friedman (2001)](https://doi.org/10.1214/aos/1013203451) develops gradient boosting as function approximation. Reading it alongside the XGBoost paper helps separate the broad learning principle from one framework’s regularization and systems innovations.
+
+<h2 id="comparison">Choosing this algorithm</h2>
+
+<ReferenceTable headers={["Compare with", "Main distinction", "When it matters"]} rows={[["Random forest", "Independent randomized trees averaged versus sequential loss-based corrections summed.", "Forests offer a straightforward parallel baseline; boosting provides finer stagewise control with more coupled choices."], ["Single tree", "One partition versus an additive collection of partitions.", "A small tree can be a usable rule set; a boosted ensemble is usually a predictive model requiring additional inspection."], ["Linear / logistic regression", "Automatic threshold interactions versus an additive score in a chosen basis.", "Linear models can be preferable for sparse distributed signal, compactness, or justified functional extrapolation."], ["AdaBoost", "Classical AdaBoost reweights examples using exponential-loss-style updates.", "Do not apply the squared-error residual narrative or the XGBoost Hessian formula to every boosting variant."], ["LightGBM / CatBoost", "Related gradient-boosted-tree systems with different growth, approximation, and categorical-data mechanisms.", "Compare the supported representation and constraints rather than treating the names as interchangeable."]]} />
+
+A useful reason to try XGBoost is that the problem appears to need a rich set of structured interactions and you can afford the extra model complexity. A weak reason is that it was successful in an unrelated competition. Start from the inductive bias and constraints, then determine whether the added flexibility is serving them.
+
+<h2 id="implementation">Implementation reference</h2>
+
+First reproduce the gain calculation without any library. Then fit a small illustrative regressor. Python requires NumPy and XGBoost; no particular parameters here are presented as a tuned recommendation.
+
+```python
+import numpy as np
+from xgboost import XGBRegressor
+
+G_left, H_left = 2.0, 2.0
+G_right, H_right = -2.0, 2.0
+lambda_, gamma, eta = 1.0, 0.1, 0.3
+w_left = -G_left / (H_left + lambda_)
+w_right = -G_right / (H_right + lambda_)
+gain = 0.5 * (
+    G_left**2 / (H_left + lambda_)
+    + G_right**2 / (H_right + lambda_)
+    - (G_left + G_right)**2 / (H_left + H_right + lambda_)
+) - gamma
+assert np.isclose(gain, 4 / 3 - 0.1)
+assert np.isclose(1 + eta * w_left, 0.8)
+
+X = np.arange(8.0).reshape(-1, 1)
+y = np.array([1., 1., 3., 3., 2., 2., 4., 4.])
+model = XGBRegressor(
+    objective="reg:squarederror", tree_method="hist",
+    n_estimators=20, max_depth=2, learning_rate=0.1,
+    reg_lambda=1.0, reg_alpha=0.0, min_child_weight=1.0,
+    random_state=7, n_jobs=1,
+).fit(X, y)
+print(model.predict([[2.5], [9.0]]))
+```
+
+For binary classification, `binary:logistic` returns probability predictions through the library’s classifier interface; raw-margin output is a logit. For a custom objective, verify the exact API’s expected derivatives and prediction transformation. The [official custom-objective tutorial](https://xgboost.readthedocs.io/en/stable/tutorials/custom_metric_obj.html) is the appropriate implementation reference.
+
+<h2 id="references">Sources & further reading</h2>
+
+1. [Friedman (2001), Greedy Function Approximation: A Gradient Boosting Machine](https://doi.org/10.1214/aos/1013203451): function-space gradient boosting.
+2. [Chen and Guestrin (2016), XGBoost: A Scalable Tree Boosting System](https://arxiv.org/abs/1603.02754): original regularized tree-boosting system paper.
+3. [XGBoost: Introduction to Boosted Trees](https://xgboost.readthedocs.io/en/stable/tutorials/model.html): objective and leaf-score derivation.
+4. [XGBoost: Parameters](https://xgboost.readthedocs.io/en/stable/parameter.html): authoritative meanings of current implementation controls.
+5. [XGBoost: Custom objective and metric](https://xgboost.readthedocs.io/en/stable/tutorials/custom_metric_obj.html): score derivatives and links.
+6. [Portfolio: Influencer or Observer](/projects/influencer-observer): a concrete application using XGBoost as one component of a broader model.

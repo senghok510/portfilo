@@ -1,0 +1,152 @@
+<h2 id="intuition">Intuition & scope</h2>
+
+A decision tree partitions feature space through a sequence of questions. At each internal node, an axis-aligned numeric split asks whether one feature is below a threshold. Following a path leads to a leaf that stores a constant prediction: a mean for squared-error regression or class proportions for ordinary classification.
+
+The model is nonlinear because different regions use different outputs. It learns interactions because a later question is asked only after earlier conditions have been satisfied. A depth-two path can express that a feature matters only within one region of another feature. The boundaries remain axis-aligned unless an oblique-tree method explicitly allows multi-feature split directions.
+
+This chapter describes CART-style binary trees. Other tree families use different split criteria, branching rules, treatment of categorical inputs, or pruning procedures. A library’s decision tree is an implementation of a particular family, not a universal definition of all tree algorithms.
+
+<h2 id="notation">Symbols & notation</h2>
+
+<Symbols rows={[["t,I_t,n_t", "A node, its set of training indices, and the number of observations in it."], ["j,s", "Candidate feature index and numeric split threshold."], ["L,R", "Left and right child nodes; the left child satisfies xⱼ ≤ s."], ["K,\\hat p_{tk}", "Number of classes and fraction of class k at node t."], ["G(t),H(t)", "Gini impurity and entropy of the labels at node t."], ["Q(t)", "Generic node impurity: Gini, entropy, or mean squared deviation."], ["R_\\ell,c_\\ell", "Feature-space region and constant prediction for leaf ℓ."], ["T,|T|", "A tree and its number of terminal leaves in the pruning objective."], ["\\alpha,d", "Nonnegative pruning penalty per leaf and maximum path depth."], ["\\mathbf1\\{A\\}", "Indicator equal to 1 when condition A holds and 0 otherwise."]]} />
+
+<h2 id="mathematics">Mathematical foundations</h2>
+
+### Recursive partitioning
+
+<Equation math={String.raw`I_L(j,s)=\{i\in I_t:x_{ij}\le s\},\qquad I_R(j,s)=I_t\setminus I_L(j,s)`} />
+
+The feature and threshold are chosen to reduce a weighted impurity. Weighting by the child sample counts is essential: averaging the two impurities equally would treat a tiny leaf like a large one.
+
+<Equation math={String.raw`\Delta Q(t;j,s)=Q(t)-\frac{n_L}{n_t}Q(L)-\frac{n_R}{n_t}Q(R),\qquad (j^*,s^*)\in\arg\max_{j,s}\Delta Q(t;j,s)`} />
+
+Only valid splits are considered: both children must satisfy minimum-size and other constraints. For distinct numeric feature values, midpoints between adjacent sorted values describe the possible training partitions. Multiple thresholds within the same gap induce the same partition of training observations.
+
+### Classification impurities and predictions
+
+<Equation math={String.raw`\hat p_{tk}=\frac1{n_t}\sum_{i\in I_t}\mathbf1\{y_i=k\},\qquad G(t)=1-\sum_{k=1}^K\hat p_{tk}^{\,2},\qquad H(t)=-\sum_{k=1}^K\hat p_{tk}\log\hat p_{tk}`} label="Use 0 log 0 = 0. Here entropy uses natural logarithms; changing its log base rescales gains." />
+
+Gini is zero in a pure node and larger when labels are mixed. For a binary node with positive fraction p, it equals 2p(1−p), reaching 0.5 at p = 0.5. Entropy also rewards purity, with a different sensitivity to small class proportions. Neither objective directly optimizes every downstream decision cost.
+
+At a leaf, a standard classifier predicts the most frequent class and estimates its probability vector from the class fractions. A leaf containing one positive observation can therefore emit probability one. That is an empirical proportion, not evidence of certainty. Sample weights replace counts with weighted counts in both impurity and probability calculations.
+
+### Regression leaves
+
+For squared-error regression, the optimal constant within a region is its sample mean:
+
+<Equation math={String.raw`c_t=\arg\min_c\sum_{i\in I_t}(y_i-c)^2=\frac1{n_t}\sum_{i\in I_t}y_i,\qquad Q(t)=\frac1{n_t}\sum_{i\in I_t}(y_i-c_t)^2`} />
+
+With a fixed partition, each leaf can be optimized independently. The full predictor is piecewise constant:
+
+<Equation math={String.raw`\hat f(x)=\sum_{\ell=1}^{|T|}c_\ell\mathbf1\{x\in R_\ell\}`} />
+
+Other losses imply other leaf statistics. Absolute error is minimized by a median; quantile loss by a corresponding quantile. Changing the loss can change both the split criterion and leaf prediction. This chapter’s numerical example uses classification Gini, not regression variance.
+
+### Cost-complexity pruning
+
+Growing until purity often creates a large, unstable tree. Cost-complexity pruning considers subtrees of a grown tree and penalizes their number of leaves:
+
+<Equation math={String.raw`T_\alpha\in\arg\min_{T\subseteq T_{\max}}\left[R(T)+\alpha|T|\right],\qquad R(T)=\sum_{\ell\in\operatorname{leaves}(T)}\frac{n_\ell}{n}Q(\ell)`} label="This uses normalized leaf impurity. Other references use summed error, which changes the numeric scale of α." />
+
+For a subtree rooted at node t, compare keeping its descendant leaves to collapsing them into one leaf. Its effective penalty threshold is:
+
+<Equation math={String.raw`\alpha_{\rm eff}(t)=\frac{R(t)-R(T_t)}{|T_t|-1}`} label="R(t) is the weighted impurity if t becomes a leaf; R(Tₜ) is the sum over its current terminal descendants." />
+
+Weakest-link pruning successively removes the subtree with the smallest effective penalty, generating a nested sequence. This optimizes a pruning tradeoff within the grown tree; it does not search all possible tree structures. See the [official pruning discussion](https://scikit-learn.org/stable/modules/tree.html#minimal-cost-complexity-pruning) for implementation details.
+
+<h2 id="learning">How learning works</h2>
+
+1. Place all training observations at the root.
+2. Search the allowed feature-threshold candidates and compute their immediate impurity reduction.
+3. Choose the best valid split, breaking ties according to the implementation.
+4. Recurse independently into the children until a stopping condition is reached.
+5. Optionally prune the grown tree using a complexity penalty.
+6. At prediction time, follow one root-to-leaf path and return that leaf’s output.
+
+The training algorithm is **greedy**. It chooses an immediately useful split without solving the full future partitioning problem. A split with weak immediate gain may enable a strong interaction two levels later, but the greedy search does not look ahead to that benefit. For XOR with balanced independent binary features, neither root feature has positive Gini gain even though a depth-two tree can represent the target exactly. Whether a zero-gain root split is allowed depends on stopping rules and the implementation.
+
+For a balanced tree, prediction visits O(d) nodes, usually with depth proportional to log n. An extremely unbalanced tree can have depth proportional to n. Training cost depends on sorting, caching, candidate features, and tree shape. A common balanced-tree estimate is roughly O(pn log n) with efficient split scanning; repeated sorting or unbalanced partitions can make it substantially worse. Storing the finished tree scales with its node count, not just its maximum depth.
+
+<h2 id="example">Worked example & figure</h2>
+
+Take feature values 1, 2, 3, 4, 5, 6 and labels 0, 0, 1, 0, 1, 1. The root has three positives and three negatives, so its Gini impurity is 0.5.
+
+At threshold 2.5, the left leaf has two negatives and is pure. The right leaf contains labels 1, 0, 1, 1, so its positive fraction is 3/4 and its impurity is 3/8.
+
+<Equation math={String.raw`G_L=0,\quad G_R=2\left(\frac34\right)\left(\frac14\right)=\frac38,\quad G_{\rm children}=\frac26(0)+\frac46\left(\frac38\right)=\frac14,\quad \Delta G=\frac12-\frac14=\frac14`} />
+
+At threshold 3.5, the two children have positive fractions 1/3 and 2/3. Each has Gini 4/9, so the gain is only 1/18. Threshold 4.5 ties with 2.5 at gain 1/4. The resulting trees may differ despite identical best immediate gains.
+
+<AlgorithmLab kind="decision-tree" />
+
+The figure displays leaf positive-class fractions as a step function. A vertical jump reflects a different path through the tree, not a smooth change in estimated probability. The threshold does not have an intrinsic scientific meaning merely because the algorithm selected it.
+
+<h2 id="controls">Algorithm controls</h2>
+
+<ReferenceTable headers={["Control", "What it restricts", "Typical consequence"]} rows={[["max_depth", "Number of split decisions on a path.", "Shallower trees express fewer nested interactions and are easier to inspect."], ["min_samples_leaf", "Minimum support for each leaf.", "Larger leaves reduce local variance and coarse probability extremes."], ["min_samples_split", "Whether a node is eligible to split.", "Does not alone guarantee adequate support in both children."], ["max_leaf_nodes", "Total leaf budget.", "Directly limits the number of constant prediction regions."], ["min_impurity_decrease", "Required improvement, with implementation-specific weighting.", "Can stop negligible gains, but may block a low-gain gateway to an interaction."], ["ccp_alpha", "Post-pruning penalty.", "Larger values favor smaller subtrees along the pruning path."], ["criterion", "How label heterogeneity is measured.", "Gini and entropy may choose different splits; regression criteria imply different leaf statistics."]]} />
+
+Strictly increasing feature transformations preserve the possible exact threshold partitions in ideal arithmetic. This explains why numeric scaling usually does not matter as it does for penalized linear models. Histogram binning, finite precision, ties, and missing-value handling can alter implementation behavior. A categorical feature encoded as arbitrary integers also imposes a threshold ordering that may be substantively meaningless; categorical splitting is library-specific.
+
+<h2 id="assumptions">Assumptions & guarantees</h2>
+
+A tree does not require a linear conditional response or Gaussian features. Its inductive bias is that useful predictions can be represented by recursive partitions using the permitted split directions and a manageable number of leaves.
+
+The constant fitted in a squared-error leaf is optimal **conditional on that partition**. The chosen greedy partition is not guaranteed globally optimal. More depth increases representational capacity but also makes it easier to model chance variation. A finite fitted tree has no universal guarantee of consistency or unbiased probabilities simply because leaves are locally pure.
+
+For a regression tree with mean-valued leaves and nonnegative training weights, every prediction lies within the training target range. Beyond the largest or smallest thresholds for a feature, a path eventually stays in the same outer region. The tree cannot continue a linear trend indefinitely. This limitation is structural, not a tuning oversight.
+
+<h2 id="limitations">Limitations & vulnerabilities</h2>
+
+- **High variance:** a small data change can alter an early split and consequently many later paths. Two apparently reasonable trees may tell different feature stories.
+- **Axis-aligned inefficiency:** a diagonal boundary may require a staircase of many leaves. An oblique tree or a linear model can sometimes describe it with far fewer parameters.
+- **Greedy interaction blindness:** useful interactions can have weak marginal split gains. A shallow greedy search may never uncover them.
+- **Discontinuity:** an arbitrarily small perturbation across a split threshold can change the prediction. Rounding, measurement noise, or a deliberately manipulated feature can switch paths.
+- **Outlier response:** squared-error regression splits and leaf means remain sensitive to extreme targets. Trees are not automatically robust merely because they avoid linear coefficients.
+- **Importance bias:** impurity-based feature importance accumulates training split improvements. Features with many candidate cut points have more opportunities for chance improvements; importance is not a causal attribution.
+- **Missing values:** an implementation may learn a default direction, use surrogate splits, or reject missing inputs. Do not transfer one library’s behavior to every CART description.
+
+The [official tree guide](https://scikit-learn.org/stable/modules/tree.html) discusses practical properties and implementation-specific support. When a decision must be explained, inspect the full relevant path and the amount of training support in its terminal leaf, not just a top-level split.
+
+<h2 id="applications">Applications & evidence</h2>
+
+**Reproducible application example:** [decision surfaces on the iris dataset](https://scikit-learn.org/stable/auto_examples/tree/plot_iris_dtc.html) visualize how trees partition pairs of flower measurements. This is a small teaching dataset that illustrates geometry; its behavior is not a benchmark for arbitrary production data.
+
+**Illustrative project use:** a compact rule for routing cases based on a few measurable thresholds may be easier to inspect as a shallow tree than as a forest. The advantage disappears if the tree grows into hundreds of leaves or relies on unstable thresholds.
+
+**Foundational reference:** Breiman, Friedman, Olshen, and Stone’s [Classification and Regression Trees (1984)](https://doi.org/10.1201/9781315139470) develops the CART framework. Its value is methodological; a tree selected from one dataset is not a universal decision policy.
+
+<h2 id="comparison">Choosing this algorithm</h2>
+
+<ReferenceTable headers={["Alternative", "Why keep a single tree?", "Why move beyond it?"]} rows={[["Linear / logistic model", "A few threshold interactions are more natural than an additive score.", "A smooth additive boundary may need far fewer parameters in a linear model."], ["Random forest", "You need one compact, inspectable path structure.", "Averaging diverse trees often reduces the instability of individual trees."], ["XGBoost", "Training and explanation simplicity matter more than a flexible ensemble.", "Sequential corrections can model structure a small tree misses."]]} />
+
+Choose a small tree deliberately when its simplicity is part of the objective. If predictive flexibility is the priority, a fully grown single tree is rarely the only candidate worth trying. A forest addresses variance through averaging; boosting builds an additive predictor through targeted corrections. These solve different weaknesses of a lone tree.
+
+<h2 id="implementation">Implementation reference</h2>
+
+```python
+import numpy as np
+from sklearn.tree import DecisionTreeClassifier, export_text
+
+X = np.arange(1.0, 7.0).reshape(-1, 1)
+y = np.array([0, 0, 1, 0, 1, 1])
+model = DecisionTreeClassifier(
+    criterion="gini", max_depth=1, min_samples_leaf=1,
+    random_state=0,
+).fit(X, y)
+print(export_text(model, feature_names=["x"]))
+
+# Both optimal thresholds have the same gain in this example.
+assert model.tree_.threshold[0] in (2.5, 4.5)
+assert np.isclose(model.tree_.impurity[0], 0.5)
+print(model.predict_proba([[2.0], [5.0]]))
+```
+
+A reproducible random state helps fix implementation-level randomness and tie behavior; it does not make the learned structure statistically stable. Probability columns follow the estimator’s class order. Read the learned rules in the same feature units supplied during fitting.
+
+<h2 id="references">Sources & further reading</h2>
+
+1. [Breiman et al. (1984), Classification and Regression Trees](https://doi.org/10.1201/9781315139470): foundational CART reference.
+2. [scikit-learn: Decision trees](https://scikit-learn.org/stable/modules/tree.html): mathematical formulation, criteria, practical limitations, and missing-value support.
+3. [scikit-learn: Cost-complexity pruning](https://scikit-learn.org/stable/auto_examples/tree/plot_cost_complexity_pruning.html): executable illustration of the pruning path.
+4. [scikit-learn: Iris decision surfaces](https://scikit-learn.org/stable/auto_examples/tree/plot_iris_dtc.html): geometric application example.
+5. [An Introduction to Statistical Learning](https://www.statlearning.com/): tree-based methods chapter for the relationship between trees, bagging, and boosting.

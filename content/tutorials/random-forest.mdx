@@ -1,0 +1,158 @@
+<h2 id="intuition">Intuition & scope</h2>
+
+A random forest combines many decision trees trained with controlled randomness. A single deep tree can adapt strongly to small changes in its sample. Averaging many sufficiently different trees reduces the portion of that variation that is not shared across them. The method keeps the ability to learn thresholds and interactions while avoiding reliance on one particular partition.
+
+The two familiar sources of randomness are **bootstrap sampling of observations** and **random feature subsets at each split**. Bagging alone randomizes the samples. Feature subsampling further prevents a few strong predictors from forcing every tree toward nearly the same structure. The cost is that an individual tree may become weaker when it cannot consider the best feature at a node.
+
+This chapter describes classical bootstrap random forests with constant-leaf trees. Implementations can disable bootstrapping, use different sample sizes, or change probability aggregation. Extra Trees add another form of randomness by drawing split thresholds rather than fully optimizing each candidate threshold; they are related to, but not identical with, ordinary random forests.
+
+<h2 id="notation">Symbols & notation</h2>
+
+<Symbols rows={[["n,p", "Training observation count and feature count."], ["B", "Number of trees in the forest."], ["m_{\\rm try}", "Number of candidate features sampled at each split."], ["\\Theta_b", "Random choices used to build tree b: sampling and split randomness."], ["T_b(x)=T(x;\\Theta_b)", "Prediction from tree b at input x."], ["\\hat p_{bk}(x)", "Class-k probability estimated by tree b at its reached leaf."], ["v,\\rho", "Common prediction variance of a tree and common pairwise prediction correlation in an idealized calculation."], ["\\mathcal B_i", "Set of trees whose bootstrap sample omitted observation i."], ["a_{bi}(x),w_i(x)", "Within-tree and forest-averaged weights assigned to training target i."], ["d,L", "Typical path depth and number of leaves per tree."]]} />
+
+<h2 id="mathematics">Mathematical foundations</h2>
+
+### Aggregating predictions
+
+For regression, average the tree outputs:
+
+<Equation math={String.raw`\hat f_B(x)=\frac1B\sum_{b=1}^B T_b(x)`} />
+
+For classification, two conventions are common. Hard voting counts predicted labels. Probability averaging combines the class proportions from each reached leaf and then takes the largest average:
+
+<Equation math={String.raw`\hat p_k(x)=\frac1B\sum_{b=1}^B\hat p_{bk}(x),\qquad \hat y(x)=\arg\max_k\hat p_k(x)`} label="This probability-averaging convention is used by scikit-learn’s RandomForestClassifier; it is not always equivalent to voting on hard labels." />
+
+For example, suppose three trees emit positive probabilities 0.51, 0.51, and 0.01. Two hard labels vote positive, but the mean probability is about 0.343, which yields a negative class at threshold 0.5. The aggregation convention can change the final answer.
+
+### Why averaging reduces variance
+
+At a fixed input, expand the variance of an average into variances and covariances. Under the simplifying assumption that each tree has prediction variance v and every distinct pair has correlation ρ:
+
+<Equation math={String.raw`\operatorname{Var}\!\left[\frac1B\sum_bT_b(x)\right]=\frac1{B^2}\left[Bv+B(B-1)\rho v\right]=v\left[\rho+\frac{1-\rho}{B}\right]`} />
+
+The unshared part falls as the tree count grows. The correlated part remains as a floor. If every tree is identical, ρ = 1 and averaging offers no variance reduction. If pairwise covariance is zero, the variance becomes v/B. Actual trees do not generally have one identical variance and correlation; the formula isolates the mechanism rather than estimating a guarantee for a fitted forest.
+
+There is a subtle distinction between conditioning on a fixed training dataset and considering repeated draws of the dataset. With independent tree random seeds, trees can be independent conditional on the dataset. They still share variation caused by the common random training dataset. Adding trees reduces Monte Carlo variability of the forest approximation; it does not remove uncertainty from having only one finite dataset.
+
+### Bootstrap inclusion and out-of-bag predictions
+
+A bootstrap sample makes n draws with replacement from n observations. For a particular observation, the probability of being absent is:
+
+<Equation math={String.raw`P(i\text{ absent})=\left(1-\frac1n\right)^n\longrightarrow e^{-1}\approx0.368`} />
+
+Thus a sample contains about 63.2% distinct training observations for large n, with repeats among the n draws. A sample of q draws instead gives absence probability (1−1/n) raised to q. This is a sampling result, not a promise that every observation is omitted from exactly the same number of trees.
+
+For observation i, an out-of-bag prediction aggregates only trees that did not train on it:
+
+<Equation math={String.raw`\hat f_{\rm OOB}(x_i)=\frac1{|\mathcal B_i|}\sum_{b\in\mathcal B_i}T_b(x_i),\qquad \mathcal B_i=\{b:i\notin\text{bootstrap sample }b\}`} label="This is defined only if at least one tree omitted i. Classification analogously aggregates class outputs." />
+
+Out-of-bag estimates are a useful consequence of the algorithm’s sampling scheme. They do not automatically correct dependence between observations, group duplication, or optimism from repeatedly making choices based on the same estimates. A complete evaluation design is outside this chapter’s scope.
+
+### A forest as adaptive averaging
+
+For regression trees with sample-mean leaves, let aᵦᵢ(x) be the fraction of bootstrap training weight assigned to observation i among the members of the leaf containing x. Repeated bootstrap observations contribute multiplicity. Within each tree those nonnegative weights sum to one.
+
+<Equation math={String.raw`T_b(x)=\sum_{i=1}^n a_{bi}(x)y_i,\qquad \hat f_B(x)=\sum_iw_i(x)y_i,\qquad w_i(x)=\frac1B\sum_ba_{bi}(x),\quad w_i(x)\ge0,\quad\sum_iw_i(x)=1`} />
+
+This makes the ordinary forest a locally adaptive smoother. The neighborhood is determined by learned tree partitions rather than Euclidean distance. The weights depend on the fitted trees and therefore can depend on training targets. The expression is useful for understanding interpolation, but it does not make the whole training procedure a fixed linear estimator in the targets.
+
+<h2 id="learning">How learning works</h2>
+
+1. For each tree, draw a bootstrap sample using an independent random stream.
+2. At each node, sample a candidate feature subset and search allowed splits within it.
+3. Grow the tree subject to depth, leaf-size, and other constraints. Classical forests often use deep trees; pruning is not required for the forest definition.
+4. Repeat independently for the remaining trees. These fits can run in parallel.
+5. Average predictions or class probabilities across trees.
+
+The **strength–correlation tradeoff** matters. Too little feature randomness can make trees highly similar. Too much can prevent individual trees from discovering useful structure. The best balance depends on how signal is distributed among features and their redundancy. If only one of many features is informative, tiny candidate sets may often miss it at important nodes.
+
+Training work is approximately B times the work of a randomized tree, with parallelism reducing wall-clock time but not total computation or memory. A rough balanced-tree cost with efficient candidate scanning is O(B m_try n log n), subject to implementation and sorting details. Prediction is roughly O(Bd), and model storage is O(BL) for fixed-size node metadata. More classes require additional leaf probability storage.
+
+The [official ensemble guide](https://scikit-learn.org/stable/modules/ensemble.html#forest) documents forest variants and implementation conventions. Breiman’s [Random Forests (2001)](https://www.stat.berkeley.edu/~breiman/randomforest2001.pdf) develops the strength-and-correlation perspective in the original classification theory.
+
+<h2 id="example">Worked example & figure</h2>
+
+Suppose three regression trees predict 10, 12, and 8 at the same input. Their average is 10. This number alone tells us nothing about the forest’s error: the unknown conditional target could still be 20. Averaging does not guarantee removal of a shared directional error.
+
+Now suppose the prediction variance of each tree across repeated datasets is 9 and the common pairwise correlation is 0.2. With ten trees, the idealized ensemble variance is 9 × (0.2 + 0.8/10) = 2.52. With one hundred trees it is 1.872. The limiting variance is 1.8. Increasing tree count from 10 to 100 helps, but cannot reach zero because the correlated component remains.
+
+<AlgorithmLab kind="random-forest" />
+
+The figure normalizes single-tree variance to one. Move the correlation slider before increasing the tree count: the floor changes far more than the far-right tail of a highly correlated ensemble. This is why decorrelation is a central design choice rather than just an implementation trick.
+
+<h2 id="controls">Algorithm controls</h2>
+
+<ReferenceTable headers={["Control", "Mechanism", "Tradeoff"]} rows={[["n_estimators", "Number of averaged trees.", "Reduces finite-forest randomness, with diminishing returns and increasing prediction cost."], ["max_features", "Candidate features per split.", "Balances individual-tree strength against similarity between trees."], ["min_samples_leaf", "Minimum support in each terminal region.", "Larger leaves smooth predictions and probabilities, but can miss narrow patterns."], ["max_depth / max_leaf_nodes", "Capacity of each base tree.", "Controls interaction detail, memory, and path length."], ["bootstrap / max_samples", "Sampling scheme and per-tree sample size.", "Changes diversity, individual-tree information, and out-of-bag availability."], ["class_weight", "Weights label contributions inside training.", "Changes learned splits and leaf proportions; does not simply adjust the final threshold."]]} />
+
+Adding trees usually stabilizes the estimate toward the infinite-forest limit for the chosen tree-building procedure. Test error need not improve monotonically at every finite tree count, and a poorly chosen base-tree procedure remains poor in the limit. Changing depth or minimum leaf size changes that limit itself.
+
+<h2 id="assumptions">Assumptions & guarantees</h2>
+
+Random forests do not require Gaussian predictors or an additive response. They assume that the permitted recursive partitions can capture meaningful local structure and that future inputs relate sufficiently to the learned regions.
+
+The variance formula is an illustrative covariance identity under stated equal-variance assumptions. It is not a general finite-sample error bound. Consistency results for particular forest variants require explicit assumptions about sampling, partition sizes, and regularity; one cannot infer them for every unconstrained library forest from the name alone.
+
+Under mean-valued leaves and nonnegative weights, regression predictions are convex combinations of training targets and remain within their observed range. Outside outer feature thresholds, each tree’s relevant path becomes constant. A forest therefore does not learn unbounded trend extrapolation in those directions. Classification leaf fractions also are not guaranteed calibrated probabilities merely because many trees are averaged.
+
+<h2 id="limitations">Limitations & vulnerabilities</h2>
+
+- **Shared bias survives:** if every tree misses an important smooth trend or lacks relevant information, averaging does not create that information.
+- **High-cardinality split opportunities:** training impurity importance can favor features that allow many potential thresholds. A large importance score is neither a causal effect nor a guarantee of transferable signal.
+- **Correlated predictors:** interchangeable features can split credit across trees. Conversely, one proxy may appear dominant because it is often selected first. Interpreting the ranking as unique scientific relevance is unsafe.
+- **Fragmented sparse signal:** when a useful decision combines many small contributions across a huge sparse feature space, axis-aligned splits can be inefficient compared with an additive linear score.
+- **Memory and latency:** hundreds of deep trees can require substantial storage and many branch traversals per prediction. Parallel training does not eliminate serving cost.
+- **Perturbations and attacks:** crossing several relevant thresholds can change votes or means. Randomization and averaging do not constitute a certificate against evasion or training-data poisoning.
+- **Misleading uncertainty:** spread among tree predictions describes diversity of the fitted ensemble. It is not, by itself, a valid confidence interval or a prediction interval for a future target.
+
+<Insight title="Interpretability is not restored by one importance plot"><p>A forest can be inspected, but its global rule is an ensemble of many partitions. Distinguish an explanation of a model’s behavior from evidence about the real mechanism that generated the data.</p></Insight>
+
+The [official feature-importance example](https://scikit-learn.org/stable/auto_examples/inspection/plot_permutation_importance.html) illustrates shortcomings of impurity-based rankings. Alternative inspection methods have their own assumptions, especially with dependent features; this chapter does not attempt a full interpretability workflow.
+
+<h2 id="applications">Applications & evidence</h2>
+
+**Published application:** [Díaz-Uriarte and Alvarez de Andrés (2006)](https://pmc.ncbi.nlm.nih.gov/articles/PMC1363357/) investigate random forests for microarray classification and gene selection. Their study includes simulated and real gene-expression datasets. It is a concrete example of forests used with many candidate predictors and nonlinear classification, not proof that forest importance uniquely identifies biological causes.
+
+**Foundational research:** [Breiman (2001)](https://www.stat.berkeley.edu/~breiman/randomforest2001.pdf) introduces the random-forest framework and analyzes classification behavior through individual-tree strength and dependence.
+
+**Illustrative project use:** heterogeneous tabular records with threshold effects are a reasonable place to consider a forest baseline. It can learn interactions without explicitly enumerating every product term. If extrapolation or a very compact additive explanation is mandatory, a linear or otherwise structured model may be more suitable.
+
+<h2 id="comparison">Choosing this algorithm</h2>
+
+<ReferenceTable headers={["Alternative", "Forest advantage", "Alternative advantage"]} rows={[["Single decision tree", "Reduces reliance on one unstable partition.", "One small tree is simpler to explain and cheaper to store and traverse."], ["Linear / logistic model", "Learns nonlinear threshold interactions directly.", "A weighted sum can be more efficient for sparse signals and easier to interpret globally."], ["Gradient boosting / XGBoost", "Independent trees enable parallel fitting; averaging is a straightforward baseline.", "Sequential corrections and explicit loss-based regularization can fit structure more efficiently in some tabular tasks."], ["Extra Trees", "Optimizes thresholds among candidate features for stronger individual splits.", "Random thresholds can reduce computation and increase diversity, with a different bias–variance tradeoff."]]} />
+
+The practical forest-versus-boosting question is not “which is always more accurate?” A forest mainly combats individual-tree variance. Boosting builds a stagewise function that targets remaining loss. Either can win, depending on structure, data size, noise, and constraints.
+
+<h2 id="implementation">Implementation reference</h2>
+
+This toy fit illustrates aggregation and out-of-bag availability. It is intentionally not presented as evidence about held-out performance.
+
+```python
+import numpy as np
+from sklearn.ensemble import RandomForestRegressor
+
+rng = np.random.default_rng(7)
+X = rng.uniform(-2, 2, size=(160, 2))
+y = X[:, 0] ** 2 + (X[:, 1] > 0).astype(float)
+forest = RandomForestRegressor(
+    n_estimators=120, max_features=1.0,
+    min_samples_leaf=3, bootstrap=True,
+    oob_score=True, random_state=7, n_jobs=-1,
+).fit(X, y)
+
+query = np.array([[0.5, 0.4]])
+individual = np.array([tree.predict(query)[0]
+                       for tree in forest.estimators_])
+assert np.isclose(forest.predict(query)[0], individual.mean())
+print(forest.predict(query), forest.oob_prediction_.shape)
+# individual.std() is NOT a predictive standard error.
+```
+
+Here `max_features=1.0` allows all supplied features at each split; bootstrap randomness remains. The parameter is explicit to make the mechanism inspectable, not to prescribe that value for every project. Use the exact classifier or regressor documentation when selecting implementation options.
+
+<h2 id="references">Sources & further reading</h2>
+
+1. [Breiman (2001), Random Forests](https://www.stat.berkeley.edu/~breiman/randomforest2001.pdf): original algorithm and theoretical perspective.
+2. [Díaz-Uriarte and Alvarez de Andrés (2006), Gene selection and classification of microarray data using random forest](https://pmc.ncbi.nlm.nih.gov/articles/PMC1363357/): application study.
+3. [scikit-learn: Forests and ensemble methods](https://scikit-learn.org/stable/modules/ensemble.html#forest): implementation conventions and variants.
+4. [scikit-learn: Impurity versus permutation importance](https://scikit-learn.org/stable/auto_examples/inspection/plot_permutation_importance.html): limitations of common importance rankings.
+5. [An Introduction to Statistical Learning](https://www.statlearning.com/): bagging and random forests in the tree-based methods chapter.

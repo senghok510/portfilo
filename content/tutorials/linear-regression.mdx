@@ -1,0 +1,156 @@
+<h2 id="intuition">Intuition & scope</h2>
+
+Linear regression predicts a numerical target by adding weighted contributions from the supplied features. Each coefficient describes a conditional change in the fitted mean: change one feature by one unit while holding the other supplied features fixed. The model is simple enough to inspect, fast enough to use as a baseline, and rich enough to become substantially nonlinear in the original inputs through carefully chosen basis functions.
+
+“Linear” refers to the **parameters**, not necessarily to the raw input. A model containing age, age squared, and an age-by-treatment interaction is still a linear regression in its coefficients. It does not discover those terms by itself. If the representation only contains raw age and treatment, the algorithm cannot invent their interaction.
+
+There are two distinct uses. **Prediction** asks for an accurate conditional mean on future observations. **Inference** asks what can be learned about a population coefficient and its uncertainty. A least-squares fit always has an algebraic interpretation, but unbiasedness, confidence intervals, and causal interpretations require additional assumptions.
+
+<h2 id="notation">Symbols & notation</h2>
+
+<Symbols rows={[["n,p", "Number of observations and features, excluding the intercept."], ["x_i,\\tilde x_i", "Raw feature vector and augmented vector (1, xᵢᵀ)ᵀ."], ["X,y", "n × (p+1) design matrix and n-dimensional target vector."], ["\\beta=(\\beta_0,\\ldots,\\beta_p)^\\top", "Coefficient vector; β₀ is the intercept."], ["\\varepsilon_i,r_i", "Unobserved population error and fitted residual yᵢ − ŷᵢ."], ["\\sigma^2", "Conditional error variance when homoscedasticity holds."], ["H,h_{ii}", "Projection (hat) matrix and its i-th diagonal leverage."], ["D", "Diagonal matrix diag(0,1,…,1), excluding the intercept from a penalty."], ["\\lambda", "Nonnegative regularization strength under the stated loss scaling."], ["U,S,V", "Singular-vector matrices and diagonal singular-value matrix of a design matrix."], ["\\eta", "Positive gradient-descent step size."]]} />
+
+<h2 id="mathematics">Mathematical foundations</h2>
+
+### The model and least-squares objective
+
+<Equation math={String.raw`y_i=\tilde x_i^\top\beta+\varepsilon_i,\qquad \hat y_i=\tilde x_i^\top\hat\beta`} label="Model specification. The error is a population quantity; the residual is computed after fitting." />
+
+<Equation math={String.raw`\hat\beta=\arg\min_\beta J(\beta),\qquad J(\beta)=\frac{1}{2n}\lVert y-X\beta\rVert_2^2`} label="We use half the mean squared error. Multiplying the whole unregularized objective by a positive constant does not change its minimizer." />
+
+Squared error targets the conditional mean because, at a fixed input, the expected squared error of a constant prediction decomposes into the conditional variance plus the square of its distance from the conditional mean. A linear model finds the best approximation available within its feature span; it need not equal the true conditional mean if the model is misspecified.
+
+### Deriving the normal equations
+
+<Equation math={String.raw`\nabla J(\beta)=\frac{1}{n}X^\top(X\beta-y),\qquad \nabla^2J(\beta)=\frac{1}{n}X^\top X\succeq0`} />
+
+Setting the gradient to zero gives the normal equations. Full column rank makes the Hessian positive definite and the coefficient solution unique.
+
+<Equation math={String.raw`X^\top X\hat\beta=X^\top y,\qquad \hat\beta=(X^\top X)^{-1}X^\top y\quad\text{if }\operatorname{rank}(X)=p+1`} />
+
+If columns are linearly dependent, multiple coefficient vectors can give the same fitted values. The Moore–Penrose pseudoinverse selects the minimum-Euclidean-norm solution. The training predictions remain uniquely defined as the orthogonal projection of the target onto the column space of the design matrix.
+
+<Equation math={String.raw`\hat\beta=X^+y,\qquad \hat y=Hy,\qquad H=XX^+,\qquad X^\top(y-\hat y)=0`} label="Residuals are orthogonal to every fitted feature column. With an intercept, residuals sum to zero." />
+
+Do not implement the inverse formula literally. QR or SVD solves avoid explicitly forming an inverse, and SVD makes rank deficiency visible. Forming the normal-equation matrix squares the spectral condition number for a full-rank design, amplifying numerical difficulties. The [official linear-model guide](https://scikit-learn.org/stable/modules/linear_model.html#ordinary-least-squares) describes the implementation and dense computational cost.
+
+### A likelihood interpretation
+
+If errors are independent Gaussian variables with mean zero and common variance, minimizing squared error also maximizes the Gaussian likelihood over the coefficients. Gaussian errors are **not required to compute OLS**. They provide one probabilistic justification and support exact finite-sample inference under the rest of the classical model.
+
+<Equation math={String.raw`-\log L(\beta,\sigma^2)=\frac n2\log(2\pi\sigma^2)+\frac{1}{2\sigma^2}\sum_{i=1}^n(y_i-\tilde x_i^\top\beta)^2`} />
+
+### Ridge and lasso: changing the estimator
+
+Ridge adds a quadratic penalty to stabilize coefficients. In this chapter the intercept is not penalized.
+
+<Equation math={String.raw`J_{\rm ridge}(\beta)=\frac{\lVert y-X\beta\rVert_2^2}{2n}+\frac\lambda2\beta^\top D\beta,\qquad \hat\beta_{\rm ridge}=(X^\top X+n\lambda D)^{-1}X^\top y`} />
+
+For centered predictors and target, write the predictor matrix as an SVD. If the singular values are denoted by s, ridge replaces the unstable OLS multiplier 1/s with a damped multiplier:
+
+<Equation math={String.raw`X_c=USV^\top,\qquad \hat\beta_{1:p}=V\operatorname{diag}\!\left(\frac{s_j}{s_j^2+n\lambda}\right)U^\top y_c`} label="Small singular directions receive the strongest relative shrinkage. Recover the intercept from the feature and target means." />
+
+Lasso replaces the quadratic penalty with an absolute-value penalty. Its corner at zero allows exact zero coefficients, which can produce a sparse representation. It is convex but not differentiable at zero, so ordinary smooth Newton updates are not directly applicable.
+
+<Equation math={String.raw`J_{\rm lasso}(\beta)=\frac{\lVert y-X\beta\rVert_2^2}{2n}+\lambda\sum_{j=1}^p|\beta_j|`} />
+
+For centered, orthonormal predictor columns satisfying XᵀX/n = I, each lasso coefficient is the soft-thresholded unregularized coefficient: sign(b) max(|b| − λ, 0), where b is the corresponding least-squares coefficient. With correlated columns, coordinates interact; this simple independent formula no longer applies. Elastic net combines the two penalties when both shrinkage and sparsity are useful. The [original lasso paper](https://doi.org/10.1111/j.2517-6161.1996.tb02080.x) develops the method.
+
+<h2 id="learning">How learning works</h2>
+
+1. Choose the feature representation, including an intercept and any intended interactions or basis functions.
+2. Solve the least-squares system with QR/SVD, or optimize a penalized objective using an appropriate solver.
+3. For a new observation, construct the same feature vector and take its dot product with the learned coefficients.
+
+For very large problems an iterative update may be preferable:
+
+<Equation math={String.raw`\beta^{(t+1)}=\beta^{(t)}-\eta\left[\frac1nX^\top(X\beta^{(t)}-y)+\lambda D\beta^{(t)}\right]`} label="Gradient descent for ridge; set λ = 0 for OLS. The superscript t indexes optimization iterations." />
+
+For a positive-definite quadratic, constant-step convergence holds when the step lies between zero and twice the reciprocal of the largest Hessian eigenvalue. In practice use a numerically established solver. Each dense gradient costs approximately O(np); a dense factorization with n at least p costs roughly O(np²), and one prediction costs O(p). Sparse representations can reduce iterative cost to scale with the number of stored nonzero entries.
+
+<h2 id="example">Worked example & figure</h2>
+
+Take three observations: (0,1), (1,2), and (2,2). With one feature and an intercept, the coefficient formulas reduce to:
+
+<Equation math={String.raw`\hat\beta_1=\frac{\sum_i(x_i-\bar x)(y_i-\bar y)}{\sum_i(x_i-\bar x)^2}=\frac12,\qquad \hat\beta_0=\bar y-\hat\beta_1\bar x=\frac76`} label="Here x̄ = 1 and ȳ = 5/3. Bars denote sample means." />
+
+The fitted outputs are 7/6, 5/3, and 13/6. Residuals are −1/6, 1/3, and −1/6; they sum to zero. Their squared sum is 1/6, giving a mean squared training error of 1/18. The line does not pass through every point because it compromises across all squared residuals.
+
+The separate five-point illustration below fixes the intercept so that you can isolate what changing a slope does. Notice that large vertical errors grow disproportionately expensive when squared.
+
+<AlgorithmLab kind="linear-regression" />
+
+<h2 id="controls">Algorithm controls</h2>
+
+<ReferenceTable headers={["Control", "Mathematical effect", "Decision implication"]} rows={[["Feature basis", "Changes the column space onto which the target is projected.", "Interactions and nonlinear terms can remove bias, but too many terms can make estimation unstable."], ["Intercept", "Adds a constant column.", "Omit only when a zero response at zero features is substantively justified."], ["Ridge λ", "Shrinks coefficients, especially weakly identified directions.", "Trades some bias for variance reduction; it does not correct a wrong functional form."], ["Lasso λ", "Can force coefficients exactly to zero.", "Selection among highly correlated features may be unstable."], ["Sample weights", "Replaces the Euclidean residual norm with a weighted norm.", "Inverse-variance weights are efficient only when that variance model is justified."]]} />
+
+A coefficient penalty depends on units. Changing a feature from meters to millimeters changes its coefficient scale and therefore its penalty unless the representation is adjusted. Also, library conventions differ: scikit-learn Ridge minimizes a sum of squares plus alpha times the squared coefficient norm, so its alpha corresponds to nλ under the ridge convention above. Do not copy the same numeric penalty across objectives without checking normalization.
+
+<h2 id="assumptions">Assumptions & guarantees</h2>
+
+**Existence of the fit** needs finite inputs; a unique coefficient solution needs full column rank. **Conditional unbiasedness** follows from a correctly specified mean and zero conditional error mean. **Gauss–Markov efficiency** additionally requires a spherical error covariance: conditional homoscedasticity and no error correlation. It gives the smallest variance among linear unbiased estimators, not among all possible estimators.
+
+<Equation math={String.raw`\mathbb E[\hat\beta\mid X]=\beta,\qquad \operatorname{Var}(\hat\beta\mid X)=\sigma^2(X^\top X)^{-1},\qquad \hat\sigma^2=\frac{\lVert y-X\hat\beta\rVert_2^2}{n-p-1}`} label="These formulas assume full rank, the classical conditional error model, and positive residual degrees of freedom." />
+
+For a new augmented input, uncertainty in the estimated mean and uncertainty in a future observation differ:
+
+<Equation math={String.raw`\operatorname{Var}(\hat y_*\mid X,\tilde x_*)=\sigma^2\tilde x_*^\top(X^\top X)^{-1}\tilde x_*,\qquad \operatorname{Var}(y_*-\hat y_*\mid X,\tilde x_*)=\sigma^2\!\left[1+\tilde x_*^\top(X^\top X)^{-1}\tilde x_*\right]`} label="The second expression also assumes independent future noise with the same variance. A prediction interval is wider than a confidence interval for the mean." />
+
+Without constant variance, the covariance instead has a sandwich form with the true conditional error covariance Ω between the two design factors: (XᵀX)⁻¹XᵀΩX(XᵀX)⁻¹. Appropriate robust estimators address uncertainty estimation; they do not automatically repair omitted-variable bias. Penalized coefficients have different bias and inferential properties from unpenalized OLS.
+
+<h2 id="limitations">Limitations & vulnerabilities</h2>
+
+- **Misspecification:** an additive plane can miss curvature, thresholds, and interactions. Residual structure can signal a missing basis term, but adding enough terms can create an unstable problem.
+- **Multicollinearity:** coefficients can move dramatically while predictions within the observed feature region barely change. A sign change is not necessarily a discovery about the underlying phenomenon.
+- **Influential observations:** squared loss has an unbounded residual gradient. Extreme targets and high-leverage feature vectors can substantially move the solution. Leverage is hᵢᵢ, a diagonal of the projection matrix; high leverage and a large residual together are particularly concerning.
+- **Extrapolation:** the line continues beyond observed data. This is useful only if the chosen functional relationship continues too. Polynomial extrapolation can be especially extreme.
+- **Endogeneity:** omitted causes, measurement error, or reverse causation can violate the zero conditional error assumption. More observations do not eliminate the resulting coefficient bias.
+- **Adversarial sensitivity:** for a fixed linear predictor, a feature perturbation δ changes its prediction by the slope vector’s dot product with δ. Under an L2 bound of ε, the largest absolute change is ε times the L2 norm of that slope vector. This algebra describes input sensitivity, not a complete security guarantee.
+
+<Insight title="What ridge cannot promise"><p>Smaller coefficients can reduce sensitivity and improve conditioning. Ridge does not make a model causal, resistant to arbitrary poisoning, or reliable under a changed relationship between features and target.</p></Insight>
+
+<h2 id="applications">Applications & evidence</h2>
+
+**Documented research example:** Efron, Hastie, Johnstone, and Tibshirani use a diabetes progression problem in [Least Angle Regression (2004)](https://arxiv.org/abs/math/0406456). The paper concerns linear-model selection and shrinkage, not a claim that plain OLS is universally optimal. It is a useful bridge from an interpretable linear model to the problem of selecting among correlated predictors.
+
+**Illustrative project use:** modeling a continuous response from a small number of scientifically meaningful covariates can make coefficient inspection valuable. If a piecewise threshold dominates the response, a tree is a useful challenger; if a smooth additive response dominates, a linear or spline basis may express it more economically.
+
+**Implementation illustration:** the [official OLS and ridge example](https://scikit-learn.org/stable/auto_examples/linear_model/plot_ols_ridge.html) compares their behavior. Treat the example as a mechanism demonstration, not evidence that one penalty is best for your task.
+
+<h2 id="comparison">Choosing this algorithm</h2>
+
+<ReferenceTable headers={["Compare with", "Prefer linear regression when…", "Prefer the alternative when…"]} rows={[["Logistic regression", "The target is a continuous numeric quantity.", "The target is binary and a probability model is needed."], ["Decision tree", "A compact additive or specified smooth relationship is plausible.", "A small number of sharp thresholds and interactions is central."], ["Random forest", "Coefficient interpretation, compact storage, or structural extrapolation matters.", "Nonlinear interactions are complex and difficult to specify manually."], ["XGBoost", "A transparent baseline or limited training budget is the priority.", "A flexible additive ensemble of interactions is justified by the problem."]]} />
+
+Before choosing OLS over a penalized linear model, ask whether the number of effective independent feature directions is large relative to the sample size. A unique algebraic fit can still have very high variance. Before choosing a nonlinear model, ask whether the additional flexibility addresses a real structural limitation of the linear representation.
+
+<h2 id="implementation">Implementation reference</h2>
+
+This reproduces the three-point calculation. It is an algorithm demonstration, not a full experimental pipeline. Python requires NumPy and scikit-learn.
+
+```python
+import numpy as np
+from sklearn.linear_model import LinearRegression, Ridge
+
+X = np.array([[0.0], [1.0], [2.0]])
+y = np.array([1.0, 2.0, 2.0])
+ols = LinearRegression().fit(X, y)
+assert np.allclose(ols.coef_, [0.5])
+assert np.isclose(ols.intercept_, 7 / 6)
+assert np.isclose(np.sum((y - ols.predict(X)) ** 2), 1 / 6)
+
+# Our objective: SSE/(2*n) + lambda_/2 * ||slopes||²
+lambda_ = 0.1
+ridge = Ridge(alpha=len(y) * lambda_).fit(X, y)
+print(ols.predict([[3.0]]))  # 2.666..., an extrapolation
+print(ridge.coef_, ridge.intercept_)
+```
+
+Do not interpret the coefficient of a standardized feature as a change per original unit. Do not assume a fitted coefficient is identifiable merely because a solver returned a number. Inspect the model representation before interpreting any effect.
+
+<h2 id="references">Sources & further reading</h2>
+
+1. [An Introduction to Statistical Learning — authors’ website](https://www.statlearning.com/): chapters on linear regression and regularization for an extended textbook treatment.
+2. [scikit-learn: Linear models](https://scikit-learn.org/stable/modules/linear_model.html): objective conventions, numerical implementations, and estimator behavior.
+3. [Tibshirani (1996), Regression Shrinkage and Selection via the Lasso](https://doi.org/10.1111/j.2517-6161.1996.tb02080.x): foundational sparse linear estimation.
+4. [Efron et al. (2004), Least Angle Regression](https://arxiv.org/abs/math/0406456): linear-model paths and the diabetes application.
+5. [scikit-learn: Common pitfalls in interpreting linear coefficients](https://scikit-learn.org/stable/auto_examples/inspection/plot_linear_model_coefficient_interpretation.html): conditional interpretation and feature dependence.
