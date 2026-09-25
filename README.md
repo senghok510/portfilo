@@ -1,7 +1,7 @@
 # Portfolio
 
-My personal portfolio, built with [Next.js](https://nextjs.org/), React and Tailwind CSS. Blog posts are written in MDX under `content/blogs`.
-
+My personal portfolio, built with [Next.js](https://nextjs.org/), React and Tailwind CSS, deployed in Vercel. Blog posts are written in MDX under `content/blogs`.
+The url is: hokseng.dev
 ## Run locally (without Docker)
 
 Requires Node.js 22+.
@@ -51,26 +51,4 @@ To run it in the background instead:
 docker compose up --build -d
 ```
 
-### 3. Useful commands
 
-| Task | Command |
-| --- | --- |
-| View logs | `docker compose logs -f` |
-| Stop the app | `docker compose down` |
-| Rebuild after changing code or blog posts | `docker compose up --build -d` |
-| Remove the built image as well | `docker compose down --rmi local` |
-
-### Change the port
-
-Edit the `ports` entry in `docker-compose.yml`. For example, to serve on port 8080:
-
-```yaml
-ports:
-  - "8080:3000"
-```
-
-### How the image is built
-
-- `Dockerfile` is a three-stage build: install dependencies, run `next build`, then copy only the standalone server output into a small `node:22-alpine` runtime image that runs as a non-root user.
-- `next.config.ts` sets `output: "standalone"` so Next.js emits a self-contained `server.js`. This is only enabled when the `NEXT_OUTPUT_STANDALONE` environment variable is set, which the Dockerfile does. Plain `npm run build` and Vercel deployments are unaffected.
-- `content/` and `public/` are copied into the image because blog posts and assets are read at runtime.
