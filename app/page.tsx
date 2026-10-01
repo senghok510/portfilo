@@ -16,8 +16,7 @@ export default function Home() {
       </h1>
       <p className="mt-4 max-w-md text-balance leading-relaxed text-stone-600">
         Welcome! I&apos;m a data science and AI student who loves building things.
-        Have a look around — my projects, internships, and blog posts are all
-        here.
+        Have a look around — my projects and internships are all here.
       </p>
     </section>
   );

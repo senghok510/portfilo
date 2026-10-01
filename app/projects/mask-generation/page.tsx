@@ -99,6 +99,14 @@ export default function MaskGenerationPage() {
           >
             Poster (PDF)
           </a>
+          <a
+            href="https://github.com/senghok510/generation_mask.git"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline decoration-stone-300 underline-offset-4 hover:text-stone-900 hover:decoration-stone-500"
+          >
+            GitHub repository
+          </a>
         </p>
       </header>
 

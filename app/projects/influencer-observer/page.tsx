@@ -106,7 +106,8 @@ export default function InfluencerObserverPage() {
           preprocessing, feature engineering, LLM-based text encoders,
           gradient-boosted classifiers, hyperparameter tuning, and a final
           bagging ensemble that reached{" "}
-          <strong>0.859 accuracy on the leaderboard</strong>.
+          <strong>0.859 accuracy on the leaderboard</strong>, placing us in the{" "}
+          <strong>top 3 out of 120 teams</strong>.
         </p>
       </Section>
 

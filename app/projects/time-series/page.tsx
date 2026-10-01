@@ -70,12 +70,20 @@ export default function TimeSeriesPage() {
           APM 52065, École Polytechnique · 2026 · with Joel Tagne W. &amp;
           Christel Mallo P.
         </p>
-        <p className="mt-1 text-sm text-stone-500">
+        <p className="mt-1 flex gap-4 text-sm text-stone-500">
           <a
             href="/time_series/Stat_procs___Christel_Joel_Hok.pdf"
             className="underline decoration-stone-300 underline-offset-4 hover:text-stone-900 hover:decoration-stone-500"
           >
             Report (PDF)
+          </a>
+          <a
+            href="https://github.com/senghok510/Stochastic_Process_Projects"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline decoration-stone-300 underline-offset-4 hover:text-stone-900 hover:decoration-stone-500"
+          >
+            GitHub repository
           </a>
         </p>
       </header>
@@ -168,13 +176,15 @@ export default function TimeSeriesPage() {
           other, with an exponentially decaying influence in time and a
           Gaussian-shaped influence in space.
         </p>
-        <Figure
-          src="/time_series/chicago-crime-maps.png"
-          alt="Two maps of Chicago built from crime coordinates: the raw unfiltered events, and the filtered events colored by type, theft and battery, densely tracing the city's street grid."
-          width={1253}
-          height={470}
-          caption="Reported crime locations in Chicago (December 2015): raw data (left) and after filtering to theft and battery (right)."
-        />
+        <div className="mx-auto max-w-2xl">
+          <Figure
+            src="/time_series/chicago-crime-maps-full.png"
+            alt="Two maps of Chicago built from crime coordinates: the raw unfiltered events, and the filtered events colored by type, theft and battery, densely tracing the city's street grid."
+            width={1500}
+            height={609}
+            caption="Reported crime locations in Chicago (December 2015): raw data (left) and after filtering to theft and battery (right)."
+          />
+        </div>
         <Remark>
           The point cloud is dense enough to redraw the city: the street
           grid, the empty airport corridor, the lakefront. Two practical

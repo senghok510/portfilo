@@ -4,7 +4,6 @@ const links = [
   { href: "/cv", label: "CV" },
   { href: "/internships", label: "Internships" },
   { href: "/projects", label: "Projects" },
-  { href: "/blogs", label: "Blogs" },
 ];
 
 export function SiteHeader() {

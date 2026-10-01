@@ -30,8 +30,6 @@ RUN addgroup --system --gid 1001 nodejs \
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-# Blog posts are read from disk at runtime (lib/posts.ts)
-COPY --from=builder --chown=nextjs:nodejs /app/content ./content
 
 USER nextjs
 EXPOSE 3000

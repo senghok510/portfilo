@@ -70,12 +70,20 @@ export default function OMRPage() {
         <p className="mt-3 text-stone-500">
           Optical Music Recognition project, École Polytechnique · Sep 2025 · with Yuguang Yao
         </p>
-        <p className="mt-1 text-sm text-stone-500">
+        <p className="mt-1 flex gap-4 text-sm text-stone-500">
           <a
             href="/OMR/Projet_d_OMR.pdf"
             className="underline decoration-stone-300 underline-offset-4 hover:text-stone-900 hover:decoration-stone-500"
           >
             Report (PDF)
+          </a>
+          <a
+            href="https://github.com/luc6987/Projet-d-OMR"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline decoration-stone-300 underline-offset-4 hover:text-stone-900 hover:decoration-stone-500"
+          >
+            GitHub repository
           </a>
         </p>
       </header>
