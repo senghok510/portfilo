@@ -34,11 +34,13 @@ const education = [
 
 const experience = [
   {
-    title: "Agentic GraphRAG for tendering",
+    title: "Agentic GraphRAG for Tendering Intelligence",
     org: "Technip Energies",
     period: "Mar 2026 – Jul 2026",
     details: [
-      "Implemented a Personalized PageRank algorithm for multi-hop questions and designed an agent system to answer a wide range of queries.",
+      "Built knowledge-graph extraction, entity-resolution, and document-classification pipelines for tender documents using Neo4j and Cypher.",
+      "Implemented graph retrieval algorithms—including penalized hub-weighted Personalized PageRank, dual-level retrieval, and community detection—with intent-based query routing.",
+      "Evaluated graph quality and workflow components through benchmarks and ablation studies, with agent tracing in MLflow.",
     ],
   },
   {

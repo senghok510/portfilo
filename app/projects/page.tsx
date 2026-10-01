@@ -14,7 +14,7 @@ const projectGroups = [
         name: "Influencer or Observer: Predicting Social Roles",
         status: "Autumn 2025",
         topics: [
-          "NLP",
+          "Fine-tuning RoBERTa/Pythia",
           "Feature engineering",
           "Transformer embeddings",
           "Optuna",

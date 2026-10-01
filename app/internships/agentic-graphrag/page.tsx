@@ -142,12 +142,20 @@ export default function AgenticGraphragPage() {
         <p className="mt-3 text-stone-500">
           Technip Energies · Mar 2026 – Jul 2026 · Supervised by Julien Cadart
         </p>
-        <p className="mt-1 text-sm text-stone-500">
+        <p className="mt-1 flex gap-4 text-sm text-stone-500">
           <a
             href="/agentic-graphrag/defense-slides.pdf"
             className="underline decoration-stone-300 underline-offset-4 hover:text-stone-900 hover:decoration-stone-500"
           >
             Defense slides (PDF)
+          </a>
+          <a
+            href="https://github.com/senghok510/agentic_graphrag_retrieval_Technip"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline decoration-stone-300 underline-offset-4 hover:text-stone-900 hover:decoration-stone-500"
+          >
+            GitHub repository
           </a>
         </p>
       </header>

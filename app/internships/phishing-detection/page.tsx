@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { MermaidDiagram } from "@/components/mermaid-diagram";
 import { RiskHistogram } from "@/components/risk-histogram";
 
 export const metadata: Metadata = {
@@ -35,6 +36,20 @@ const pipelineStages = [
       "A Streamlit dashboard ranks the email queue by risk, highlights extracted entities inline, and shows a per-indicator score breakdown.",
   },
 ];
+
+const workflowDiagram = `flowchart TD
+  email["Incoming email (.eml)"] --> parsing["1. Email parsing"]
+  parsing --> headers["Header forensics<br/>SPF · DKIM · DMARC · spoofing"]
+  parsing --> content["Body and attachments"]
+  headers --> signals["Collected signals"]
+  content --> gliner["2. GLiNER entity extraction"]
+  content --> regex["Regex safety net"]
+  gliner --> indicators["URLs · brands · urgency<br/>credentials · malware · crypto"]
+  regex --> indicators
+  indicators --> enrichment["3. Threat-intelligence enrichment<br/>VirusTotal · AbuseIPDB · WHOIS"]
+  enrichment --> signals
+  signals --> scoring["4. Weighted risk scoring<br/>LOW · MEDIUM · HIGH · CRITICAL"]
+  scoring --> dashboard["5. Analyst dashboard<br/>rank · highlight · explain"]`;
 
 const entityLabels = [
   { label: "suspicious url", example: "http://paypal-secure.attacker.xyz/login" },
@@ -135,6 +150,15 @@ export default function PhishingDetectionPage() {
 
       <Section title="How the pipeline works">
         <p>An incoming email flows through five stages:</p>
+        <figure className="overflow-hidden rounded-lg border border-stone-200 bg-white p-4 sm:p-6">
+          <MermaidDiagram
+            chart={workflowDiagram}
+            ariaLabel="Phishing detection workflow: an incoming email is parsed, analyzed by header forensics, GLiNER, and regex rules, enriched with threat intelligence, assigned a weighted risk score, and presented in an analyst dashboard."
+          />
+          <figcaption className="mt-3 text-center text-sm text-stone-500">
+            End-to-end email analysis and explainable risk-scoring workflow.
+          </figcaption>
+        </figure>
         <ol className="list-decimal space-y-3 pl-5">
           {pipelineStages.map((stage) => (
             <li key={stage.name}>

@@ -14,7 +14,6 @@ const internships = [
     description:
       "Built an agentic GraphRAG system for tendering: implemented a Personalized PageRank algorithm for multi-hop questions and designed a multi-agent system to answer a wide range of queries over tender documents.",
     writeup: "/internships/agentic-graphrag",
-    slides: "/agentic-graphrag/defense-slides.pdf",
   },
   {
     company: "PPS",
@@ -44,24 +43,14 @@ export default function InternshipsPage() {
             <p className="mt-2 leading-relaxed text-stone-600">
               {internship.description}
             </p>
-            {(internship.writeup || internship.slides) && (
+            {internship.writeup && (
               <p className="mt-2 flex gap-4 text-sm">
-                {internship.writeup && (
-                  <Link
-                    href={internship.writeup}
-                    className="font-medium underline decoration-stone-300 underline-offset-4 hover:decoration-stone-500"
-                  >
-                    Read the write-up →
-                  </Link>
-                )}
-                {internship.slides && (
-                  <a
-                    href={internship.slides}
-                    className="text-stone-500 underline decoration-stone-300 underline-offset-4 hover:text-stone-900 hover:decoration-stone-500"
-                  >
-                    Slides (PDF)
-                  </a>
-                )}
+                <Link
+                  href={internship.writeup}
+                  className="font-medium underline decoration-stone-300 underline-offset-4 hover:decoration-stone-500"
+                >
+                  Read the write-up →
+                </Link>
               </p>
             )}
           </li>
