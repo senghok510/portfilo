@@ -3,11 +3,15 @@
 :root {
   --background: #ffffff;
   --foreground: #1c1c1c;
+  --accent: #2563eb;
+  --accent-soft: #eff4ff;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -16,4 +20,35 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Links turn blue on hover, everywhere on the site. */
+a {
+  transition:
+    color 0.15s ease,
+    text-decoration-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+a:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+
+/* Hovering a list entry highlights its title in blue. */
+main li:hover > div > h2,
+main li:hover > div > h3,
+main li:hover > h2,
+main li:hover > h3 {
+  color: var(--accent);
+}
+
+main h2,
+main h3 {
+  transition: color 0.15s ease;
 }

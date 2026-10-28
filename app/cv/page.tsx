@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SocialIcon } from "@/components/social-icon";
 
 export const metadata: Metadata = {
   title: "CV",
@@ -6,10 +7,10 @@ export const metadata: Metadata = {
 
 // Edit the data below to keep the CV up to date.
 const contact = [
-  { label: "hok.seng@polytechnique.edu", href: "mailto:hok.seng@polytechnique.edu" },
+  { label: "hok.seng@polytechnique.edu", href: "mailto:hok.seng@polytechnique.edu", icon: "Email" },
   { label: "(+33) 749 469 189", href: "tel:+33749469189" },
-  { label: "LinkedIn", href: "https://www.linkedin.com/in/hok-seng" },
-  { label: "GitHub", href: "https://github.com/senghok510" },
+  { label: "LinkedIn", href: "https://www.linkedin.com/in/hok-seng", icon: "LinkedIn" },
+  { label: "GitHub", href: "https://github.com/senghok510", icon: "GitHub" },
 ];
 
 const summary =
@@ -175,8 +176,9 @@ export default function CVPage() {
             <li key={item.label}>
               <a
                 href={item.href}
-                className="transition-colors hover:text-stone-900"
+                className="inline-flex items-center gap-1.5 transition-colors hover:text-stone-900"
               >
+                {item.icon && <SocialIcon name={item.icon} />}
                 {item.label}
               </a>
             </li>
