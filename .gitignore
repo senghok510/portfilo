@@ -6,6 +6,8 @@
 # testing
 /coverage
 
+graphify-out/
+
 # next.js
 /.next/
 /out/
@@ -31,3 +33,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+
+#skills
+.claude
+
+
+# claude md
+CLAUDE.md
