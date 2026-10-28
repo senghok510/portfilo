@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
+import ppsLogo from "@/images/logos/pps_logo.png";
+import technipLogo from "@/images/logos/technip_logo.png";
 
 export const metadata: Metadata = {
   title: "Internships",
@@ -9,6 +12,7 @@ export const metadata: Metadata = {
 const internships = [
   {
     company: "Technip Energies",
+    logo: technipLogo,
     role: "Data Science & AI Intern",
     period: "Mar 2026 – Jul 2026",
     description:
@@ -17,6 +21,7 @@ const internships = [
   },
   {
     company: "PPS",
+    logo: ppsLogo,
     role: "Machine Learning Intern",
     period: "Jun 2025 – Sep 2025",
     description:
@@ -27,14 +32,21 @@ const internships = [
 
 export default function InternshipsPage() {
   return (
-    <section className="mx-auto w-full max-w-3xl px-6 py-12">
+    <section className="mx-auto w-full max-w-4xl px-6 py-12">
       <h1 className="text-2xl font-semibold tracking-tight">Internships</h1>
       <ul className="mt-8 space-y-10">
         {internships.map((internship) => (
           <li key={`${internship.company}-${internship.period}`}>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-lg font-medium">
-                {internship.role} · {internship.company}
+              <h2 className="flex items-center gap-3 text-lg font-medium">
+                <Image
+                  src={internship.logo}
+                  alt={`${internship.company} logo`}
+                  className="h-6 w-auto shrink-0"
+                />
+                <span>
+                  {internship.role} · {internship.company}
+                </span>
               </h2>
               <span className="text-sm text-stone-500">
                 {internship.period}

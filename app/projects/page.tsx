@@ -78,7 +78,7 @@ const projectGroups = [
 
 export default function ProjectsPage() {
   return (
-    <section className="mx-auto w-full max-w-3xl px-6 py-12">
+    <section className="mx-auto w-full max-w-4xl px-6 py-12">
       <header className="relative overflow-hidden rounded-2xl border border-[#c6dce8] bg-gradient-to-br from-[#eef7fb] via-white to-stone-50 px-6 py-8 shadow-sm sm:px-8 sm:py-10">
         <div className="relative z-10 max-w-lg pr-20 sm:pr-32">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#075078]">
