@@ -6,7 +6,47 @@ export const metadata: Metadata = {
   title: "School Projects",
 };
 
-const projectGroups = [
+type Project = {
+  name: string;
+  status: string;
+  topics: string[];
+  description: string;
+  link?: string;
+};
+
+const projectGroups: { title: string; projects: Project[] }[] = [
+  {
+    title: "Ongoing",
+    projects: [
+      {
+        name: "SheetPilot: Multi-Agent Spreadsheet Automation with SkillOpt",
+        status: "Sep 2026 – Present",
+        topics: [
+          "Multi-agent systems",
+          "SkillOpt",
+          "Financial modelling",
+          "SpreadsheetBench 2",
+        ],
+        description:
+          "Multi-agent assistant for financial reporting with three specialised agents — spreadsheet generation for budget models, formula debugging and repair, and KPI chart visualisation. Investigating SkillOpt-based optimisation of agent skills through execution feedback, formula dependency analysis and recalculation checks, with reproducible evaluations on SpreadsheetBench 2 comparing single-agent and multi-agent approaches on accuracy, workbook preservation, latency and cost.",
+      },
+      {
+        name: "Multimodal OCR Fine-Tuning for Document Digitization",
+        status: "Ongoing",
+        topics: [
+          "OCR",
+          "Multimodal models",
+          "Fine-tuning",
+          "PaddleOCR-VL",
+          "SVTR",
+          "DBNet",
+          "PP-OCR",
+        ],
+        description:
+          "Fine-tuning multimodal OCR models to convert scanned documents into digitised, editable formats such as Word, building on open-source Chinese pretrained models: PaddleOCR-VL, SVTR, DBNet and PP-OCR.",
+      },
+    ],
+  },
   {
     title: "Machine Learning",
     projects: [
@@ -74,6 +114,40 @@ const projectGroups = [
       },
     ],
   },
+  {
+    title: "Hackathon",
+    projects: [
+      {
+        name: "Île-de-France Mobilités Data Visualization Hackathon",
+        status: "2026",
+        topics: [
+          "Data visualization",
+          "Public transport",
+          "Accessibility",
+          "Employment",
+          "Inequality",
+          "Train timetables",
+        ],
+        description:
+          "Île-de-France Mobilités visualization hackathon (2026): built an interactive data visualization exploring how access to employment relates to public-transport accessibility, using train timetables to reveal territorial inequalities across the region.",
+        link: "https://dataviz.hokseng.dev",
+      },
+      {
+        name: "MMBU Challenge: Biomedical Object Detection with Fine-Tuned VLMs",
+        status: "2026",
+        topics: [
+          "Vision-language models",
+          "Fine-tuning",
+          "Object detection",
+          "Biomedical imaging",
+          "Benchmarking",
+        ],
+        description:
+          "Challenge built on MMBU (Massive Multimodal Biomedical Understanding), the Stanford benchmark that tests how well vision-language models perceive biomedical images across 11 modalities. Its authors report that object detection is the main failure mode: models often recognise a finding when given a region but struggle to localise it on their own. I fine-tuned an open-source VLM on the object-detection task, aiming for precise localisation and to compete with the baselines published by the Stanford team.",
+        link: "https://arxiv.org/abs/2606.06696",
+      },
+    ],
+  },
 ];
 
 export default function ProjectsPage() {
@@ -104,23 +178,48 @@ export default function ProjectsPage() {
           className="absolute right-3 top-1/2 h-36 w-auto -translate-y-1/2 drop-shadow-sm sm:right-7 sm:h-48"
         />
       </header>
-      <div className="mt-10 space-y-14">
+      <div className="mt-10 space-y-6">
         {projectGroups.map((group) => (
-          <section key={group.title}>
-            <h2 className="border-b-2 border-stone-300 pb-3 text-2xl font-semibold tracking-tight text-stone-900">
-              {group.title}
-            </h2>
+          <details key={group.title} className="group">
+            <summary className="flex cursor-pointer list-none items-center gap-3 border-b-2 border-stone-300 pb-3 marker:hidden hover:border-accent hover:text-accent [&::-webkit-details-marker]:hidden">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 20 20"
+                className="size-5 shrink-0 transition-transform group-open:rotate-90"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M7 4l6 6-6 6" />
+              </svg>
+              <h2 className="text-2xl font-semibold tracking-tight">
+                {group.title}
+              </h2>
+              <span className="ml-auto text-sm text-stone-500">
+                {group.projects.length}{" "}
+                {group.projects.length === 1 ? "project" : "projects"}
+              </span>
+            </summary>
             <ul className="mt-7 space-y-10">
               {group.projects.map((project) => (
                 <li key={project.name}>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <h3 className="text-lg font-medium">
-                      <a
-                        href={project.link}
-                        className="underline decoration-stone-300 underline-offset-4 hover:decoration-stone-500"
-                      >
-                        {project.name}
-                      </a>
+                      {project.link ? (
+                        <a
+                          href={project.link}
+                          {...(project.link.startsWith("http")
+                            ? { target: "_blank", rel: "noopener noreferrer" }
+                            : {})}
+                          className="underline decoration-stone-300 underline-offset-4 hover:decoration-stone-500"
+                        >
+                          {project.name}
+                        </a>
+                      ) : (
+                        project.name
+                      )}
                     </h3>
                     <span className="text-sm text-stone-500">
                       {project.status}
@@ -145,7 +244,7 @@ export default function ProjectsPage() {
                 </li>
               ))}
             </ul>
-          </section>
+          </details>
         ))}
       </div>
     </section>
