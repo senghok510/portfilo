@@ -15,6 +15,10 @@ graphify-out/
 # production
 /build
 
+# python (the demo-model training script)
+__pycache__/
+*.pyc
+
 # misc
 .DS_Store
 *.pem
