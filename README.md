@@ -1,6 +1,6 @@
 # Portfolio
 
-My personal portfolio, built with [Next.js](https://nextjs.org/), React and Tailwind CSS, deployed in Vercel. Blog posts are written in MDX under `content/blogs`.
+My personal portfolio, built with [Next.js](https://nextjs.org/), React and Tailwind CSS, deployed in Vercel. Blog posts live under `app/blog/<slug>/page.tsx`; add each new post to the list in `lib/posts.ts` so it shows up on `/blog`.
 The url is: hokseng.dev
 ## Run locally (without Docker)
 
