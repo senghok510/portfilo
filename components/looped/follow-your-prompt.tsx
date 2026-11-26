@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { config, topK } from "@/lib/looped-demo/model";
 import {
   attentionFor, buildScene, changedDims, embeddingAt, headSummaries, hiddenAt,
@@ -73,10 +73,20 @@ export function FollowYourPrompt() {
     [comparing, altText, loops, generated.length],
   );
 
+  // The figure starts itself the first time it scrolls into view, and holds
+  // the loop 1 -> 2 hand-off twice as long, because that is the moment the
+  // whole figure exists to show.
+  const figureRef = useRef<HTMLElement>(null);
+  const dwellOn = useMemo(
+    () => (scene.firstReturnStep >= 0 ? [scene.firstReturnStep] : []),
+    [scene.firstReturnStep],
+  );
   const player = usePlayer({
     count: scene.steps.length,
     stepMs: 1500,
-    stopOnce: scene.firstReturnStep >= 0 ? [scene.firstReturnStep] : [],
+    dwellOn,
+    dwellFactor: 2.2,
+    autoPlayWhenVisible: figureRef,
   });
 
   // A new sentence is a new scene. Done here, on the commit, rather than in an
@@ -167,6 +177,7 @@ export function FollowYourPrompt() {
 
   return (
     <Figure
+      rootRef={figureRef}
       label="Figure 1 · interactive"
       title="Follow your prompt through the loop"
       note={`${config.paramCount.toLocaleString()} weights · ${config.vocabSize}-token vocabulary`}
@@ -322,10 +333,10 @@ export function FollowYourPrompt() {
 
       <NowLine step={stageTitle} tone={step.stage === "return" ? "accent" : "plain"}>
         {narrate(scene, player.index, head, safePos)}
-        {player.haltedAt === player.index ? (
+        {step.stage === "return" && step.loop === 1 ? (
           <span className="mt-1 block text-[12px] font-medium text-accent">
-            Paused here on purpose — this is the moment the loop closes. Press Play
-            to carry on.
+            This is the moment the loop closes, so the figure lingers here. The
+            two strips below are the same token before and after one pass.
           </span>
         ) : null}
       </NowLine>

@@ -1,39 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-
-const REDUCED_QUERY = "(prefers-reduced-motion: reduce)";
-
-function subscribeReducedMotion(onChange: () => void): () => void {
-  if (typeof window === "undefined" || !window.matchMedia) return () => {};
-  const mq = window.matchMedia(REDUCED_QUERY);
-  mq.addEventListener("change", onChange);
-  return () => mq.removeEventListener("change", onChange);
-}
-
-function readReducedMotion(): boolean {
-  if (typeof window === "undefined" || !window.matchMedia) return false;
-  return window.matchMedia(REDUCED_QUERY).matches;
-}
-
-/** True when the reader has asked the system to minimise animation. */
-export function useReducedMotion(): boolean {
-  return useSyncExternalStore(
-    subscribeReducedMotion,
-    readReducedMotion,
-    () => false, // the server renders the un-reduced layout
-  );
-}
+import { animate, useReducedMotion, type AnimationPlaybackControls } from "motion/react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type PlayerOptions = {
   /** Number of steps in the timeline. */
   count: number;
   /** Milliseconds each step is held during playback. */
   stepMs?: number;
-  /** Step indices where playback should stop once, the first time through. */
-  stopOnce?: number[];
+  /** Steps held longer than the rest, so a key moment gets room to land. */
+  dwellOn?: number[];
+  /** How much longer those steps are held. */
+  dwellFactor?: number;
   /** Where the timeline opens. */
   initialIndex?: number;
+  /**
+   * Start playing by itself, once, when this element first scrolls into view.
+   * Honours prefers-reduced-motion: nothing auto-plays when motion is reduced.
+   */
+  autoPlayWhenVisible?: React.RefObject<Element | null>;
 };
 
 export type Player = {
@@ -41,8 +26,8 @@ export type Player = {
   /** 0 → 1 progress through the current step; 1 whenever nothing is animating. */
   phase: number;
   playing: boolean;
-  /** Set when playback halted itself at a `stopOnce` step. */
-  haltedAt: number | null;
+  /** True until the auto-play run has been started or pre-empted. */
+  autoPlayed: boolean;
   play: () => void;
   pause: () => void;
   toggle: () => void;
@@ -54,116 +39,192 @@ export type Player = {
 };
 
 /**
- * Drives a step timeline with play/pause, stepping and scrubbing. Playback
- * tweens `phase` across each step so figures can animate inside a step, and
- * collapses to discrete steps when the reader prefers reduced motion.
+ * Drives a step timeline with play/pause, stepping and scrubbing.
+ *
+ * The whole playback run lives inside one effect that depends only on
+ * `playing`. Everything else it needs is read through refs, because the
+ * options object is rebuilt on every parent render — if those values were
+ * dependencies, the per-frame `setPhase` would restart the effect before a
+ * step could ever finish, and the timeline would never advance.
+ *
+ * Motion's `animate` supplies the frame loop and the easing, and gives back
+ * controls that stop cleanly when the effect tears down.
  */
 export function usePlayer({
-  count, stepMs = 1400, stopOnce = [], initialIndex = 0,
+  count,
+  stepMs = 1400,
+  dwellOn = [],
+  dwellFactor = 2,
+  initialIndex = 0,
+  autoPlayWhenVisible,
 }: PlayerOptions): Player {
-  const reducedMotion = useReducedMotion();
-  const [rawIndex, setIndex] = useState(initialIndex);
-  const [rawPhase, setPhase] = useState(1);
+  const reducedMotion = useReducedMotion() ?? false;
+  const [indexState, setIndexState] = useState(initialIndex);
+  const [phase, setPhase] = useState(1);
   const [playing, setPlaying] = useState(false);
-  const [haltedAt, setHaltedAt] = useState<number | null>(null);
-  const used = useRef<Set<number>>(new Set());
-  const stops = useMemo(() => new Set(stopOnce), [stopOnce]);
+  const [autoPlayed, setAutoPlayed] = useState(false);
 
-  // Clamped on read rather than corrected in an effect, so a timeline that
-  // shrinks never renders an out-of-range step.
-  const last = Math.max(0, count - 1);
-  const index = Math.min(rawIndex, last);
+  // Mutable mirrors of the options, refreshed every render so the playback
+  // effect can read current values without taking them as dependencies.
+  const indexRef = useRef(initialIndex);
+  // Set as soon as the reader touches the controls, or the auto-run starts, so
+  // a figure scrolled into view later never hijacks what they were doing.
+  const autoSettled = useRef(false);
+  const opts = useRef({ count, stepMs, dwellOn, dwellFactor, reducedMotion });
+  useEffect(() => {
+    opts.current = { count, stepMs, dwellOn, dwellFactor, reducedMotion };
+  });
 
-  const pause = useCallback(() => setPlaying(false), []);
+  const lastIndex = Math.max(0, count - 1);
+  const index = Math.min(indexState, lastIndex);
+
+  const commit = useCallback((i: number) => {
+    indexRef.current = i;
+    setIndexState(i);
+  }, []);
+
+  const takeOver = useCallback(() => {
+    autoSettled.current = true;
+    setAutoPlayed(true);
+  }, []);
+
+  const pause = useCallback(() => {
+    takeOver();
+    setPlaying(false);
+  }, [takeOver]);
   const play = useCallback(() => {
-    setHaltedAt(null);
-    setIndex((i) => (Math.min(i, last) >= last ? 0 : Math.min(i, last)));
+    takeOver();
+    const last = Math.max(0, opts.current.count - 1);
+    if (indexRef.current >= last) commit(0);
     setPlaying(true);
-  }, [last]);
+  }, [commit, takeOver]);
   const toggle = useCallback(() => {
-    setPlaying((p) => {
-      if (p) return false;
-      setHaltedAt(null);
-      setIndex((i) => (Math.min(i, last) >= last ? 0 : Math.min(i, last)));
-      return true;
-    });
-  }, [last]);
+    if (playing) setPlaying(false);
+    else play();
+  }, [playing, play]);
 
   const step = useCallback(
     (delta: number) => {
+      takeOver();
       setPlaying(false);
-      setHaltedAt(null);
       setPhase(1);
-      setIndex((i) => Math.min(last, Math.max(0, Math.min(i, last) + delta)));
+      const last = Math.max(0, opts.current.count - 1);
+      commit(Math.min(last, Math.max(0, indexRef.current + delta)));
     },
-    [last],
+    [commit, takeOver],
   );
   const next = useCallback(() => step(1), [step]);
   const prev = useCallback(() => step(-1), [step]);
+
   const reset = useCallback(() => {
+    takeOver();
     setPlaying(false);
-    setHaltedAt(null);
     setPhase(1);
-    setIndex(0);
-    used.current = new Set();
-  }, []);
+    commit(0);
+  }, [commit, takeOver]);
+
   const seek = useCallback(
     (i: number) => {
+      takeOver();
       setPlaying(false);
-      setHaltedAt(null);
       setPhase(1);
-      setIndex(Math.min(last, Math.max(0, i)));
+      const last = Math.max(0, opts.current.count - 1);
+      commit(Math.min(last, Math.max(0, i)));
     },
-    [last],
+    [commit, takeOver],
   );
 
-  // Advancing the timeline is the one place that drives itself, so it is a
-  // genuine subscription: a timer or a frame callback pushes the next step in.
+  // One playback run, from Play to the end of the timeline or the next pause.
   useEffect(() => {
     if (!playing) return undefined;
 
-    const advance = () =>
-      setIndex((i) => {
-        const n = Math.min(i, last) + 1;
-        if (n > last) {
-          setPlaying(false);
-          return Math.min(i, last);
-        }
-        if (stops.has(n) && !used.current.has(n)) {
-          used.current.add(n);
-          setPlaying(false);
-          setHaltedAt(n);
-        }
-        return n;
-      });
+    let cancelled = false;
+    let controls: AnimationPlaybackControls | null = null;
+    let timer = 0;
 
-    if (reducedMotion) {
-      const id = window.setTimeout(advance, stepMs);
-      return () => window.clearTimeout(id);
-    }
-
-    let raf = 0;
-    let start = 0;
-    const tick = (now: number) => {
-      if (!start) start = now;
-      const p = Math.min(1, (now - start) / stepMs);
-      setPhase(p);
-      if (p >= 1) {
-        start = 0;
-        advance();
-      }
-      raf = window.requestAnimationFrame(tick);
+    const durationOf = (i: number) => {
+      const o = opts.current;
+      return o.dwellOn.includes(i) ? o.stepMs * o.dwellFactor : o.stepMs;
     };
-    raf = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(raf);
-  }, [playing, index, last, stepMs, reducedMotion, stops]);
+
+    const advance = () => {
+      if (cancelled) return;
+      const last = Math.max(0, opts.current.count - 1);
+      const target = Math.min(indexRef.current, last) + 1;
+      if (target > last) {
+        setPlaying(false);
+        return;
+      }
+      commit(target);
+      runStep(target);
+    };
+
+    const runStep = (i: number) => {
+      if (cancelled) return;
+      const ms = durationOf(i);
+      if (opts.current.reducedMotion) {
+        // No tweening: hold the step, then move on.
+        setPhase(1);
+        timer = window.setTimeout(advance, ms);
+        return;
+      }
+      controls = animate(0, 1, {
+        duration: ms / 1000,
+        ease: "easeInOut",
+        onUpdate: (v) => {
+          if (!cancelled) setPhase(v);
+        },
+        onComplete: advance,
+      });
+    };
+
+    runStep(Math.min(indexRef.current, Math.max(0, opts.current.count - 1)));
+
+    return () => {
+      cancelled = true;
+      controls?.stop();
+      window.clearTimeout(timer);
+      setPhase(1);
+    };
+  }, [playing, commit]);
+
+  // Auto-play once, when the figure first comes into view. The observer
+  // callback is an external subscription, so starting playback from it does
+  // not cascade renders the way a bare effect would.
+  const autoRef = autoPlayWhenVisible;
+  useEffect(() => {
+    const el = autoRef?.current;
+    if (!el || reducedMotion) return undefined;
+    if (typeof IntersectionObserver === "undefined") return undefined;
+
+    const start = () => {
+      if (autoSettled.current) return;
+      autoSettled.current = true;
+      setAutoPlayed(true);
+      indexRef.current = 0;
+      setIndexState(0);
+      setPlaying(true);
+    };
+
+    // threshold 0: any sliver on screen is enough. These figures are often
+    // taller than the viewport, so a fractional threshold can never be met.
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        io.disconnect();
+        start();
+      },
+      { threshold: 0 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [autoRef, reducedMotion]);
 
   return {
     index,
-    // Anything that is not mid-playback shows the step fully rendered.
-    phase: reducedMotion || !playing ? 1 : rawPhase,
+    phase: reducedMotion || !playing ? 1 : phase,
     playing,
-    haltedAt,
+    autoPlayed,
     play, pause, toggle, next, prev, reset, seek, reducedMotion,
   };
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "motion/react";
 import { useId } from "react";
 import type { Player } from "./use-player";
 
@@ -41,16 +42,17 @@ export function sharedScale(groups: ArrayLike<number>[]): number {
 /* ------------------------------------------------------------------ shell */
 
 export function Figure({
-  label, title, children, caption, note,
+  label, title, children, caption, note, rootRef,
 }: {
   label: string;
   title: string;
   children: React.ReactNode;
   caption: React.ReactNode;
   note?: React.ReactNode;
+  rootRef?: React.Ref<HTMLElement>;
 }) {
   return (
-    <figure className="not-prose my-8">
+    <figure ref={rootRef} className="not-prose my-8">
       <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-stone-100 px-4 py-3 sm:px-5">
           <span className="text-[11px] font-semibold tracking-[0.12em] text-stone-400 uppercase">
@@ -248,7 +250,15 @@ export function NowLine({
       <div className="text-[11px] font-semibold tracking-[0.1em] text-stone-500 uppercase">
         {step}
       </div>
-      <p className="mt-1 text-sm leading-relaxed text-stone-700">{children}</p>
+      <motion.p
+        key={String(step)}
+        initial={{ opacity: 0, y: 3 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.28, ease: "easeOut" }}
+        className="mt-1 text-sm leading-relaxed text-stone-700"
+      >
+        {children}
+      </motion.p>
     </div>
   );
 }

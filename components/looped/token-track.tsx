@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "motion/react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { config } from "@/lib/looped-demo/model";
 import type { AttentionEdge } from "@/lib/looped-demo/scene";
@@ -166,14 +167,25 @@ export function TokenTrack({
               const lift = Math.min(ARC_BAND - 6, 12 + span * 0.3);
               const peeked = peek === e.position;
               return (
-                <path
+                <motion.path
+                  // Keyed by position alone, so an arc that survives from one
+                  // loop to the next thickens in place as its weight grows,
+                  // instead of being thrown away and redrawn.
                   key={e.position}
                   d={`M ${sx} ${ARC_BAND - 2} Q ${(sx + qx) / 2} ${ARC_BAND - lift} ${qx} ${ARC_BAND - 2}`}
                   fill="none"
-                  stroke={peeked ? "#b45309" : "var(--accent)"}
-                  strokeWidth={0.9 + e.weight * 3.6}
-                  strokeOpacity={peeked ? 0.95 : 0.2 + e.weight * 0.65}
                   strokeLinecap="round"
+                  initial={{ pathLength: 0, strokeOpacity: 0 }}
+                  animate={{
+                    pathLength: 1,
+                    stroke: peeked ? "#b45309" : "#2563eb",
+                    strokeWidth: 0.9 + e.weight * 3.6,
+                    strokeOpacity: peeked ? 0.95 : 0.2 + e.weight * 0.65,
+                  }}
+                  transition={{
+                    pathLength: { duration: 0.45, ease: "easeOut" },
+                    default: { duration: 0.35, ease: "easeInOut" },
+                  }}
                 />
               );
             })}

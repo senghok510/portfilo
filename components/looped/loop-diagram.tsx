@@ -1,10 +1,14 @@
 "use client";
 
+import { motion } from "motion/react";
 import { config } from "@/lib/looped-demo/model";
 import type { Stage } from "@/lib/looped-demo/scene";
 import { valueColor } from "./figure-kit";
 
 const D = config.dModel;
+const ACCENT = "#2563eb";
+const ACCENT_SOFT = "#eff4ff";
+const FADE = { duration: 0.32, ease: "easeInOut" } as const;
 
 // The feedback arrow, as a cubic Bézier evaluated in JS so the travelling
 // packet can be placed exactly on it without measuring the DOM.
@@ -12,6 +16,8 @@ const P0 = { x: 275, y: 143 };
 const P1 = { x: 275, y: 188 };
 const P2 = { x: 139, y: 188 };
 const P3 = { x: 139, y: 131 };
+
+const REST = { x: 36, y: 112 };
 
 function bezier(t: number) {
   const u = 1 - t;
@@ -25,27 +31,42 @@ function bezier(t: number) {
   };
 }
 
-/** A small heat strip used as the "vector in transit" token. */
+const PACKET_W = 46;
+const PACKET_H = 13;
+
+/**
+ * The "vector in transit". It glides between the stages of the block, but
+ * follows the feedback curve exactly, frame by frame, while the state is
+ * travelling back round — so the arrow is traced rather than approximated.
+ */
 function Packet({
-  values, scale, x, y, w = 46, h = 13,
+  values, scale, x, y, visible, tracking,
 }: {
   values: Float64Array;
   scale: number;
   x: number;
   y: number;
-  w?: number;
-  h?: number;
+  visible: boolean;
+  tracking: boolean;
 }) {
-  const cw = w / D;
+  const cw = PACKET_W / D;
   return (
-    <g transform={`translate(${x - w / 2} ${y - h / 2})`}>
-      <rect x={-1.5} y={-1.5} width={w + 3} height={h + 3} rx={3}
+    <motion.g
+      initial={false}
+      animate={{ x: x - PACKET_W / 2, y: y - PACKET_H / 2, opacity: visible ? 1 : 0 }}
+      transition={
+        tracking
+          ? { duration: 0 }
+          : { type: "spring", stiffness: 210, damping: 26, opacity: { duration: 0.25 } }
+      }
+    >
+      <rect x={-1.5} y={-1.5} width={PACKET_W + 3} height={PACKET_H + 3} rx={3}
             fill="#ffffff" stroke="var(--accent)" strokeWidth={1.2} />
       {Array.from({ length: D }, (_, i) => (
-        <rect key={i} x={i * cw} y={0} width={cw + 0.35} height={h}
+        <rect key={i} x={i * cw} y={0} width={cw + 0.35} height={PACKET_H}
               fill={valueColor(values[i], scale)} />
       ))}
-    </g>
+    </motion.g>
   );
 }
 
@@ -70,7 +91,8 @@ export function LoopDiagram({
   const returning = stage === "return";
   const emitted = stage === "readout" || stage === "emit";
 
-  // Where the packet sits right now.
+  // Where the packet sits right now. REST is only used to park it, invisibly,
+  // before the vectors exist.
   let pk: { x: number; y: number } | null = null;
   if (returning) {
     const t = reducedMotion ? 0.5 : phase;
@@ -122,9 +144,13 @@ export function LoopDiagram({
             markerEnd="url(#ld-arrow)" />
 
       {/* input injection */}
-      <circle cx="139" cy="112" r="16"
-              fill={returning ? "var(--accent-soft)" : "#fafaf9"}
-              stroke={returning ? "var(--accent)" : "#d6d3d1"} strokeWidth="1.2" />
+      <motion.circle cx="139" cy="112" r="16" strokeWidth="1.2"
+              initial={false}
+              animate={{ fill: returning ? ACCENT_SOFT : "#fafaf9",
+                         stroke: returning ? ACCENT : "#d6d3d1",
+                         scale: returning ? 1.08 : 1 }}
+              style={{ originX: "139px", originY: "112px" }}
+              transition={FADE} />
       <text x="139" y="117" textAnchor="middle"
             className="fill-stone-600 text-[14px]">+</text>
       <text x="139" y="80" textAnchor="middle"
@@ -133,29 +159,42 @@ export function LoopDiagram({
             markerEnd="url(#ld-arrow)" />
 
       {/* the one shared block */}
-      <rect x="190" y="84" width="170" height="59" rx="7"
-            fill={inBlock ? "var(--accent-soft)" : "#ffffff"}
-            stroke="var(--accent)" strokeWidth={inBlock ? 1.6 : 1.1} />
-      <rect x="199" y="91" width="72" height="34" rx="4"
-            fill={inAttn ? "var(--accent)" : "#ffffff"}
-            stroke={inAttn ? "var(--accent)" : "#d6d3d1"} />
-      <text x="235" y="102" textAnchor="middle" className="text-[10.5px]"
-            fill={inAttn ? "#ffffff" : "#78716c"}>attention</text>
-      <rect x="279" y="91" width="72" height="34" rx="4"
-            fill={inFF ? "var(--accent)" : "#ffffff"}
-            stroke={inFF ? "var(--accent)" : "#d6d3d1"} />
-      <text x="315" y="102" textAnchor="middle" className="text-[10.5px]"
-            fill={inFF ? "#ffffff" : "#78716c"}>feed-forward</text>
+      <motion.rect x="190" y="84" width="170" height="59" rx="7"
+            stroke="var(--accent)"
+            initial={false}
+            animate={{ fill: inBlock ? ACCENT_SOFT : "#ffffff",
+                       strokeWidth: inBlock ? 1.6 : 1.1 }}
+            transition={FADE} />
+      <motion.rect x="199" y="91" width="72" height="34" rx="4"
+            initial={false}
+            animate={{ fill: inAttn ? ACCENT : "#ffffff",
+                       stroke: inAttn ? ACCENT : "#d6d3d1" }}
+            transition={FADE} />
+      <motion.text x="235" y="102" textAnchor="middle" className="text-[10.5px]"
+            initial={false}
+            animate={{ fill: inAttn ? "#ffffff" : "#78716c" }}
+            transition={FADE}>attention</motion.text>
+      <motion.rect x="279" y="91" width="72" height="34" rx="4"
+            initial={false}
+            animate={{ fill: inFF ? ACCENT : "#ffffff",
+                       stroke: inFF ? ACCENT : "#d6d3d1" }}
+            transition={FADE} />
+      <motion.text x="315" y="102" textAnchor="middle" className="text-[10.5px]"
+            initial={false}
+            animate={{ fill: inFF ? "#ffffff" : "#78716c" }}
+            transition={FADE}>feed-forward</motion.text>
       <text x="275" y="137" textAnchor="middle" className="text-[11.5px] font-medium"
             fill="var(--accent)">one shared block θ</text>
 
       {/* feedback: the same weights, entered again */}
-      <path
+      <motion.path
         d={`M ${P0.x} ${P0.y} C ${P1.x} ${P1.y} ${P2.x} ${P2.y} ${P3.x} ${P3.y}`}
         fill="none"
-        stroke={returning ? "var(--accent)" : "#d6d3d1"}
-        strokeWidth={returning ? 1.8 : 1.2}
         strokeDasharray="4 3"
+        initial={false}
+        animate={{ stroke: returning ? ACCENT : "#d6d3d1",
+                   strokeWidth: returning ? 1.8 : 1.2 }}
+        transition={FADE}
         markerEnd={returning ? "url(#ld-arrow-accent)" : "url(#ld-arrow)"}
       />
       <text x="207" y="203" textAnchor="middle"
@@ -183,7 +222,14 @@ export function LoopDiagram({
         </text>
       </g>
 
-      {pk ? <Packet values={packet} scale={packetScale} x={pk.x} y={pk.y} /> : null}
+      <Packet
+        values={packet}
+        scale={packetScale}
+        x={(pk ?? REST).x}
+        y={(pk ?? REST).y}
+        visible={pk !== null}
+        tracking={returning}
+      />
     </svg>
   );
 }
