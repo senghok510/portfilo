@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Formula } from "@/components/formula";
+import { FollowYourPrompt } from "@/components/looped/follow-your-prompt";
+import { InputInjection } from "@/components/looped/input-injection";
+import { MazeExplorer } from "@/components/looped/maze-explorer";
+import { UnrollTheLoop } from "@/components/looped/unroll-the-loop";
+import { CARD, CARD_TEXT } from "@/lib/looped-demo/card";
 import { formatDate, posts } from "@/lib/posts";
 
 const post = posts.find((p) => p.slug === "looped-attention")!;
@@ -31,6 +36,14 @@ function Remark({ children }: { children: React.ReactNode }) {
   );
 }
 
+function Note({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-sm leading-relaxed text-stone-600">
+      <span className="font-medium text-stone-900">{title}</span> {children}
+    </div>
+  );
+}
+
 function Code({ children }: { children: string }) {
   return (
     <pre className="overflow-x-auto rounded-lg border border-stone-200 bg-stone-50 p-4 font-mono text-[13px] leading-relaxed text-stone-800">
@@ -49,61 +62,6 @@ function Ref({ href, children }: { href: string; children: React.ReactNode }) {
     >
       {children}
     </a>
-  );
-}
-
-function ArchitectureFigure() {
-  const box = "fill-stone-50 stroke-stone-300";
-  const text = "fill-stone-700 text-[13px]";
-  const blocks = ["θ₁", "θ₂", "θ₃", "θ₄"];
-  return (
-    <svg
-      viewBox="0 0 680 262"
-      role="img"
-      aria-label="Two diagrams. Top: a stacked transformer passes the input x through four blocks with different weights theta 1 to theta 4, then outputs y. Bottom: a looped transformer embeds x, adds the embedding to the hidden state, passes it through one shared block theta, and feeds the result back T times before outputting y."
-      className="h-auto w-full"
-    >
-      <defs>
-        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-          <path d="M0,0 L10,5 L0,10 z" className="fill-stone-500" />
-        </marker>
-        <marker id="arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-          <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)" />
-        </marker>
-      </defs>
-
-      {/* Stacked */}
-      <text x="0" y="18" className="fill-stone-400 text-[11px] font-semibold tracking-[0.12em]">STACKED · 4 BLOCKS, 4 WEIGHT SETS</text>
-      <text x="14" y="69" className={text}>x</text>
-      {blocks.map((b, i) => (
-        <g key={b}>
-          <line x1={i === 0 ? 30 : 90 + (i - 1) * 120 + 70} y1="64" x2={90 + i * 120 - 4} y2="64" className="stroke-stone-500" markerEnd="url(#arrow)" />
-          <rect x={90 + i * 120} y="44" width="70" height="40" rx="6" className={box} />
-          <text x={125 + i * 120} y="69" textAnchor="middle" className={text}>{b}</text>
-        </g>
-      ))}
-      <line x1="520" y1="64" x2="586" y2="64" className="stroke-stone-500" markerEnd="url(#arrow)" />
-      <text x="596" y="69" className={text}>y</text>
-
-      {/* Looped */}
-      <text x="0" y="128" className="fill-stone-400 text-[11px] font-semibold tracking-[0.12em]">LOOPED · 1 BLOCK, 1 WEIGHT SET, T LOOPS</text>
-      <text x="14" y="219" className={text}>x</text>
-      <line x1="30" y1="214" x2="86" y2="214" className="stroke-stone-500" markerEnd="url(#arrow)" />
-      <rect x="90" y="194" width="70" height="40" rx="6" className={box} />
-      <text x="125" y="219" textAnchor="middle" className={text}>e(x)</text>
-      <line x1="160" y1="214" x2="226" y2="214" className="stroke-stone-500" markerEnd="url(#arrow)" />
-      <circle cx="245" cy="214" r="16" className={box} />
-      <text x="245" y="219" textAnchor="middle" className={text}>+</text>
-      <line x1="261" y1="214" x2="326" y2="214" className="stroke-stone-500" markerEnd="url(#arrow)" />
-      <rect x="330" y="194" width="110" height="40" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" />
-      <text x="385" y="219" textAnchor="middle" className="text-[13px] font-medium" fill="var(--accent)">shared block θ</text>
-      <path d="M385,194 C385,150 245,150 245,196" fill="none" stroke="var(--accent)" strokeDasharray="4 3" markerEnd="url(#arrow-accent)" />
-      <text x="315" y="152" textAnchor="middle" className="text-[12px]" fill="var(--accent)">h⁽ᵗ⁺¹⁾ · repeat T times</text>
-      <text x="200" y="252" textAnchor="middle" className="fill-stone-500 text-[11px]">input injection: e(x) re-added every loop</text>
-      <line x1="440" y1="214" x2="586" y2="214" className="stroke-stone-500" markerEnd="url(#arrow)" />
-      <text x="513" y="206" textAnchor="middle" className="fill-stone-500 text-[11px]">after loop T</text>
-      <text x="596" y="219" className={text}>y</text>
-    </svg>
   );
 }
 
@@ -168,8 +126,41 @@ export default function LoopedAttentionPost() {
 
       <Section title="1 · From stacked layers to a loop">
         <p>
-          Write the hidden states of a sequence after layer <em>l</em> as{" "}
-          <em>h</em>
+          Before any notation, here is the whole idea actually running. The
+          figure below is a small looped transformer — one block, one set of
+          weights — working on a sentence in your browser. Press Play. Then pick
+          a word and follow it round the loop.
+        </p>
+
+        <FollowYourPrompt />
+
+        <Note title="About the model in Figure 1.">
+          It is a genuinely weight-tied causal language model: one pre-norm block
+          of {CARD.heads} attention heads and a {CARD.dFF}-unit feed-forward
+          layer, {CARD.dModel} dimensions wide, {CARD_TEXT.paramsPretty} weights
+          in total, applied up to {CARD.maxLoops} times with the embedded input
+          added back on every pass. Everything on screen is computed from its
+          forward pass, in the page, with no server. Its{" "}
+          <strong>tokenizer</strong> is its own, not GPT&rsquo;s: a{" "}
+          {CARD.vocab}-entry lowercase vocabulary of whole words, falling back to
+          one token per character for anything it has not seen, which is why the
+          figure marks those chips. Its <strong>training</strong> is mine, not a
+          download:{" "}
+          <Ref href="https://github.com/senghok510/portfilo/blob/main/scripts/looped-demo/train.py">
+            a short PyTorch script
+          </Ref>{" "}
+          runs next-token prediction over 24,000 generated sentences about people
+          putting coloured objects into containers, sampling the loop count from{" "}
+          {CARD_TEXT.loopRange} at every step so one set of weights stays usable
+          at any depth you choose. Held-out next-token accuracy is{" "}
+          {CARD_TEXT.accuracyPct}. It is a teaching model and it knows nothing
+          outside that small world: ask it about anything else and it will answer
+          confidently and wrongly, which is worth seeing too.
+        </Note>
+
+        <p>
+          Now the notation. Write the hidden states of a sequence after layer{" "}
+          <em>l</em> as <em>h</em>
           <sup>(l)</sup>. A normal transformer with <em>L</em> layers applies a
           different function at every step:
         </p>
@@ -187,13 +178,7 @@ export default function LoopedAttentionPost() {
           iteration. The second change, called <strong>input injection</strong>,
           turns out to matter a lot. I come back to it below.
         </p>
-        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white p-5">
-          <ArchitectureFigure />
-        </div>
-        <p className="text-sm text-stone-500">
-          Stacked depth (top) versus looped depth (bottom). The looped model
-          has the parameter count of one block but the compute of T blocks.
-        </p>
+        <UnrollTheLoop />
         <Remark>
           Weight sharing across depth is not new. The Universal Transformer
           (Dehghani et al., 2018) already applied one block recurrently, and
@@ -220,6 +205,8 @@ export default function LoopedAttentionPost() {
           of such an algorithm. Running it <em>T</em> times runs <em>T</em>{" "}
           rounds, with no new weights.
         </p>
+
+        <MazeExplorer />
         <p>
           Giannou et al. (2023) pushed this view to its limit. They showed
           that a fixed, small transformer, placed in a loop, can be wired by
@@ -243,6 +230,8 @@ export default function LoopedAttentionPost() {
           transformers to learn algorithms in-context and to stay stable when
           run for more loops than in training.
         </p>
+
+        <InputInjection />
         <p>
           <strong>Deciding how many loops.</strong> There are three common
           options. The simplest is a fixed <em>T</em>. The Universal
@@ -265,6 +254,20 @@ export default function LoopedAttentionPost() {
         </p>
         <p>Here is the whole idea in a few lines of PyTorch:</p>
         <Code>{loopedCode}</Code>
+        <Note title="How Figure 1 differs from this snippet.">
+          The snippet above is the architecture on its own: it takes embeddings{" "}
+          <code className="font-mono text-[13px]">e</code> that something else
+          produced and returns hidden states, with no tokenizer, no output head
+          and no sampling — you could not ask it for a word. The model in Figure 1
+          wraps that same loop in the missing pieces: a tokenizer and embedding
+          table in front of it, and a final normalisation plus an output head over
+          the {CARD.vocab}-token vocabulary behind it, so the last position&rsquo;s
+          hidden state becomes a probability for every token and the winner can be
+          appended to the sentence. The loop in the middle is the same three lines.
+          That is also why the figure keeps two counters: the loops are depth
+          inside one forward pass, while the generated tokens are separate forward
+          passes over a sentence that keeps growing.
+        </Note>
       </Section>
 
       <Section title="4 · What loops buy you">
