@@ -12,6 +12,8 @@ type Project = {
   topics: string[];
   description: string;
   link?: string;
+  /** Extra material shown under the description, e.g. a report or a demo. */
+  links?: { label: string; href: string }[];
 };
 
 const projectGroups: { title: string; projects: Project[] }[] = [
@@ -130,7 +132,11 @@ const projectGroups: { title: string; projects: Project[] }[] = [
         ],
         description:
           "Île-de-France Mobilités visualization hackathon (2026): built an interactive data visualization exploring how access to employment relates to public-transport accessibility, using train timetables to reveal territorial inequalities across the region.",
-        link: "https://dataviz.hokseng.dev",
+        link: "/dataviz-idf/index.html",
+        links: [
+          { label: "Open the explorer", href: "/dataviz-idf/explorer.html" },
+          { label: "Method and calculations (PDF)", href: "/dataviz-idf/report_idf.pdf" },
+        ],
       },
       {
         name: "MMBU Challenge: Biomedical Object Detection with Fine-Tuned VLMs",
@@ -241,6 +247,22 @@ export default function ProjectsPage() {
                   <p className="mt-3 leading-relaxed text-stone-600">
                     {project.description}
                   </p>
+                  {project.links?.length ? (
+                    <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-stone-500">
+                      {project.links.map((extra) => (
+                        <a
+                          key={extra.href}
+                          href={extra.href}
+                          {...(extra.href.startsWith("http")
+                            ? { target: "_blank", rel: "noopener noreferrer" }
+                            : {})}
+                          className="underline decoration-stone-300 underline-offset-4 hover:text-stone-900 hover:decoration-stone-500"
+                        >
+                          {extra.label}
+                        </a>
+                      ))}
+                    </p>
+                  ) : null}
                 </li>
               ))}
             </ul>
