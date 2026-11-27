@@ -3,7 +3,7 @@
 import { motion } from "motion/react";
 import { config } from "@/lib/looped-demo/model";
 import type { Stage } from "@/lib/looped-demo/scene";
-import { valueColor } from "./figure-kit";
+import { valueColor } from "@/components/figures/figure-kit";
 
 const D = config.dModel;
 const ACCENT = "#2563eb";
