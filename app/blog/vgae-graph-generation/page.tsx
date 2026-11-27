@@ -232,6 +232,21 @@ export default function VgaePost() {
           I trained for it, and every number comes from that run rather than
           from the handout.
         </p>
+
+        <Note title="Credit where it is due.">
+          The lab is <em>Advanced Learning for Text and Graph Data</em>, lab
+          session 6, &ldquo;Learning on Sets and Graph Generative
+          Models&rdquo;, École Polytechnique, November 2026. The course is
+          taught by <strong>Prof. Michalis Vazirgiannis</strong>; the lab was
+          written by <strong>Achilleas Tsimichodimos</strong> and{" "}
+          <strong>Iakovos Evdaimon</strong>, and the handout acknowledges
+          significant contributions to its content from{" "}
+          <strong>Prof. Giannis Nikolentzos</strong>. The problem, the dataset
+          design, the model specification, the tasks and the questions are all
+          theirs. Mine is only the implementation, the figures, and the results
+          — including the places where those results disagree with the
+          hyperparameters the handout prescribes.
+        </Note>
         <p>
           The short version of what I found: the architecture is the easy part.
           Built exactly as prescribed, the generator{" "}
@@ -779,12 +794,14 @@ export default function VgaePost() {
             triangle counting and every layout in this post.
           </li>
           <li>
-            Vazirgiannis, Tsimichodimos and Evdaimon,{" "}
+            Vazirgiannis (lecture), Tsimichodimos and Evdaimon (lab), with
+            acknowledged contributions from Nikolentzos,{" "}
             <em>
-              Advanced Learning for Text and Graph Data, lab 6: Learning on Sets
-              and Graph Generative Models
+              Advanced Learning for Text and Graph Data, lab session 6: Learning
+              on Sets and Graph Generative Models
             </em>
-            , École Polytechnique, 2026. The handout these tasks come from.
+            , École Polytechnique, November 2026. The handout these tasks,
+            questions and model specifications come from.
           </li>
         </ol>
       </Section>
