@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { blockParamCount, sharedParamCount } from "@/lib/looped-demo/model";
-import { Figure } from "./figure-kit";
+import { Figure } from "@/components/figures/figure-kit";
 
 const DEPTH = 4;
 const BOX_W = 40;

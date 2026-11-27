@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useRef } from "react";
-import { Counter, Figure, NowLine, Transport } from "./figure-kit";
-import { usePlayer } from "./use-player";
+import { Counter, Figure, NowLine, Transport } from "@/components/figures/figure-kit";
+import { usePlayer } from "@/components/figures/use-player";
 
 const PASSES = 7;
 const E = 1;

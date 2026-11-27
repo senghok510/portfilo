@@ -10,6 +10,16 @@ export type Post = {
 
 export const posts: Post[] = [
   {
+    slug: "vgae-graph-generation",
+    title:
+      "Variational Graph Autoencoders: Generating Graphs to Order",
+    date: "2026-11-27",
+    readingTime: "16 min read",
+    summary:
+      "Working through the conditional variational graph autoencoder from ALTEGRAD lab 6, by actually building it: three families of random graphs, a model you can ask for a given density and triangle count, and the one hyperparameter that decides whether it beats a coin flip. With five interactive figures built on NetworkX and a model trained for the post.",
+    tags: ["Graph neural networks", "Generative models", "Deep learning"],
+  },
+  {
     slug: "looped-attention",
     title: "Looped Attention: Running One Transformer Block Many Times",
     date: "2026-11-26",

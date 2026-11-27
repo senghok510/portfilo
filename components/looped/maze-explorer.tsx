@@ -5,8 +5,8 @@ import {
   BLOCKABLE, COLS, DIRS, FOCUS, MAZE, ROWS, neighbours, runSearch, snapshot,
   type Dir,
 } from "@/lib/looped-demo/maze";
-import { Counter, Figure, NowLine, Panel, Transport } from "./figure-kit";
-import { usePlayer } from "./use-player";
+import { Counter, Figure, NowLine, Panel, Transport } from "@/components/figures/figure-kit";
+import { usePlayer } from "@/components/figures/use-player";
 
 const CELL = 36;
 const W = COLS * CELL;

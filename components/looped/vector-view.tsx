@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { config } from "@/lib/looped-demo/model";
-import { valueColor } from "./figure-kit";
+import { valueColor } from "@/components/figures/figure-kit";
 
 const D = config.dModel;
 

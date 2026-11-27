@@ -9,12 +9,12 @@ import {
 import { tokenize, type Token } from "@/lib/looped-demo/tokenizer";
 import {
   Counter, Figure, NowLine, Panel, ScaleKey, Transport,
-} from "./figure-kit";
+} from "@/components/figures/figure-kit";
 import { LoopDiagram } from "./loop-diagram";
 import { Predictions } from "./predictions";
 import { TokenTrack } from "./token-track";
 import { DeltaRow, HeatRow, PickedValue, TopMovers } from "./vector-view";
-import { usePlayer } from "./use-player";
+import { usePlayer } from "@/components/figures/use-player";
 
 const DEFAULT_TEXT = "Mira put the blue key in the drawer. The key is in the";
 const BLUE = /\bblue\b/i;
