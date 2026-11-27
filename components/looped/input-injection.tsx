@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { Counter, Figure, NowLine, Transport } from "./figure-kit";
 import { usePlayer } from "./use-player";
 
@@ -164,11 +164,17 @@ function Lane({ inject, values, pass, phase, reducedMotion }: LaneProps) {
 
 export function InputInjection() {
   const { without, withInj } = useMemo(() => series(), []);
-  const player = usePlayer({ count: PASSES + 1, stepMs: 1100 });
+  const figureRef = useRef<HTMLElement>(null);
+  const player = usePlayer({
+    count: PASSES + 1,
+    stepMs: 1100,
+    autoPlayWhenVisible: figureRef,
+  });
   const pass = player.index;
 
   return (
     <Figure
+      rootRef={figureRef}
       label="Figure 4 · interactive"
       title="What the “+ e” is for"
       note="scalar illustration"
